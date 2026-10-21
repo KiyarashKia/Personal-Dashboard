@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import useSWR from "swr";
 import { MotionConfig, motion } from "motion/react";
 import {
@@ -10,6 +10,7 @@ import {
   BookOpen,
   Check,
   CheckCheck,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   CircleHelp,
@@ -37,12 +38,20 @@ import {
 import { computeMetrics, percent, validWeights } from "@/lib/metrics";
 import {
   DEFAULT_WEIGHTS,
-  DOMAIN_NAMES,
   type DataResponse,
   type Mode,
   type Weights,
 } from "@/lib/types";
-import { Ring, Sparkline, TrendChart, Heatmap } from "./charts";
+import {
+  DOMAIN_TONES,
+  DomainBars,
+  DomainRings,
+  Heatmap,
+  Meter,
+  Ring,
+  Sparkline,
+  TrendChart,
+} from "./charts";
 import { Card } from "./card";
 
 const MODES: Mode[] = ["day", "week", "month", "year"];
@@ -59,12 +68,6 @@ const PERIOD_NAMES: Record<Mode, string> = {
   week: "Weekly",
   month: "Monthly",
   year: "Yearly",
-};
-const DOMAIN_COLORS: Record<string, string> = {
-  learning: "blue",
-  health: "mint",
-  career: "lavender",
-  admin: "amber",
 };
 async function fetcher(url: string): Promise<DataResponse> {
   const res = await fetch(url, { cache: "no-store" }),
@@ -152,13 +155,54 @@ function RateBars({
     </div>
   );
 }
-function EmptyRate({ scheduled }: { scheduled: number }) {
+
+function days(n: number) {
+  return `${n} ${n === 1 ? "day" : "days"}`;
+}
+function OverviewTile({
+  id,
+  open,
+  onToggle,
+  icon,
+  label,
+  value,
+  visual,
+  note,
+  children,
+}: {
+  id: string;
+  open: boolean;
+  onToggle: () => void;
+  icon: ReactNode;
+  label: string;
+  value: ReactNode;
+  visual: ReactNode;
+  note: string;
+  children: ReactNode;
+}) {
   return (
-    <p className="metric-context">
-      {scheduled
-        ? `${scheduled} scheduled activities`
-        : "No scheduled activities in this period"}
-    </p>
+    <div className={`overview-card ${open ? "expanded" : ""}`}>
+      <button
+        className="overview-summary"
+        aria-expanded={open}
+        aria-controls={`more-${id}`}
+        onClick={onToggle}
+      >
+        <span className="overview-label">
+          {icon}
+          <span>{label}</span>
+          <ChevronDown size={15} className="overview-chevron" />
+        </span>
+        <span className="overview-content">
+          {value}
+          {visual}
+        </span>
+        <span className="overview-note">{note}</span>
+      </button>
+      <div className="overview-more" id={`more-${id}`}>
+        <div>{children}</div>
+      </div>
+    </div>
   );
 }
 
@@ -194,6 +238,7 @@ export default function Dashboard({
   >(null);
   const [online, setOnline] = useState(true),
     [now, setNow] = useState(initial ? Date.parse(initial.data.fetchedAt) : 0);
+  const [open, setOpen] = useState<number | null>(null);
   const dialog = useRef<HTMLDialogElement>(null);
   const refresh = initial?.data.refreshSeconds ?? 60;
   const { data, error, isValidating, mutate } = useSWR<DataResponse>(
@@ -292,6 +337,7 @@ export default function Dashboard({
         e.metaKey
       )
         return;
+      if (e.key === "Escape") setOpen(null);
       if (e.key.toLowerCase() === "t") {
         setAnchor(dataset?.today ?? anchor);
       }
@@ -317,6 +363,9 @@ export default function Dashboard({
   }
   function state(id: string, index: number) {
     setStates((old) => ({ ...old, [id]: index }));
+  }
+  function toggle(tile: number) {
+    setOpen((old) => (old === tile ? null : tile));
   }
   function openBalance() {
     setDraft(weights);
@@ -421,10 +470,7 @@ export default function Dashboard({
           </div>
         </header>
         <div className="title-row">
-          <div>
-            <div className="section-kicker">THE BIGGER PICTURE</div>
-            <h1>{TITLES[mode]}</h1>
-          </div>
+          <h1>{TITLES[mode]}</h1>
           <div className="period-picker">
             <button
               className="icon-button"
@@ -456,6 +502,11 @@ export default function Dashboard({
             </button>
             <button
               className="today-button"
+              disabled={
+                !dataset ||
+                periodFor(mode, anchor).start ===
+                  periodFor(mode, dataset.today).start
+              }
               onClick={() => {
                 setAnchor(dataset?.today ?? anchor);
                 updateURL(mode, dataset?.today ?? anchor);
@@ -469,17 +520,16 @@ export default function Dashboard({
           <div
             className="overview"
             aria-label="Overall performance through today"
+            data-open={open ?? undefined}
           >
-            <button
-              className="overview-card"
-              onClick={() => setPanel("overview")}
-            >
-              <div className="overview-label">
-                <Target size={16} />
-                <span>Overall progress</span>
-              </div>
-              <div className="overview-content">
-                <NumberValue value={percent(m.global.overall.rate)} />
+            <OverviewTile
+              id="overall"
+              open={open === 0}
+              onToggle={() => toggle(0)}
+              icon={<Target size={16} />}
+              label="Overall progress"
+              value={<NumberValue value={percent(m.global.overall.rate)} />}
+              visual={
                 <div className="mini-progress">
                   <i
                     style={{
@@ -487,44 +537,77 @@ export default function Dashboard({
                     }}
                   />
                 </div>
-              </div>
-              <span className="overview-note">
-                {m.global.overall.completed} of {m.global.overall.scheduled} to
-                date
-              </span>
-            </button>
-            <button className="overview-card" onClick={openBalance}>
-              <div className="overview-label">
-                <Leaf size={16} />
-                <span>Routine balance</span>
-              </div>
-              <div className="overview-content">
+              }
+              note={`${m.global.overall.completed} of ${m.global.overall.scheduled} to date`}
+            >
+              <dl className="overview-facts">
+                <div>
+                  <dt>Completed</dt>
+                  <dd>
+                    {m.global.overall.completed} of {m.global.overall.scheduled}
+                  </dd>
+                </div>
+                <div>
+                  <dt>{PERIOD_NAMES[mode]} completion</dt>
+                  <dd>{percent(m.performance.rate)}</dd>
+                </div>
+                <div>
+                  <dt>Last 30 days</dt>
+                  <dd>{percent(m.global.rolling.rate)}</dd>
+                </div>
+              </dl>
+              <p className="fine-print">
+                Global metrics always run through today.
+              </p>
+            </OverviewTile>
+            <OverviewTile
+              id="balance"
+              open={open === 1}
+              onToggle={() => toggle(1)}
+              icon={<Leaf size={16} />}
+              label="Routine balance"
+              value={
                 <NumberValue
                   value={m.global.balance.score ?? "—"}
                   unit="/ 100"
                 />
-                <span className="balance-orbit" aria-hidden="true">
-                  <i />
-                  <i />
-                  <i />
-                  <i />
-                </span>
-              </div>
-              <span className="overview-note">{m.global.balance.phrase}</span>
-            </button>
-            <button
-              className="overview-card"
-              onClick={() => setPanel("overview")}
+              }
+              visual={<DomainBars data={m.global.balance.domains} />}
+              note={m.global.balance.phrase}
             >
-              <div className="overview-label">
-                <Flame size={16} />
-                <span>French streak</span>
-              </div>
-              <div className="overview-content">
+              <dl className="overview-facts">
+                {m.global.balance.domains.map((d) => (
+                  <div key={d.domain}>
+                    <dt>
+                      <span
+                        className={`domain-dot ${DOMAIN_TONES[d.domain]}`}
+                      />
+                      {d.label}
+                    </dt>
+                    <dd>
+                      {d.rate === null ? "Not tracked" : percent(d.rate)}
+                      <small>{d.weight}% weight</small>
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+              <button className="text-button" onClick={openBalance}>
+                Adjust weights
+              </button>
+            </OverviewTile>
+            <OverviewTile
+              id="streak"
+              open={open === 2}
+              onToggle={() => toggle(2)}
+              icon={<Flame size={16} />}
+              label="French streak"
+              value={
                 <NumberValue
                   value={m.global.streak.current}
                   unit={m.global.streak.current === 1 ? "day" : "days"}
                 />
+              }
+              visual={
                 <div className="streak-marks" aria-hidden="true">
                   {Array.from({ length: 7 }, (_, i) => (
                     <i
@@ -533,25 +616,54 @@ export default function Dashboard({
                     />
                   ))}
                 </div>
-              </div>
-              <span className="overview-note">One practice makes a day</span>
-            </button>
-            <button
-              className="overview-card"
-              onClick={() => setPanel("overview")}
+              }
+              note="One practice makes a day"
             >
-              <div className="overview-label">
-                <TrendingUp size={16} />
-                <span>30-day momentum</span>
-              </div>
-              <div className="overview-content">
-                <NumberValue value={percent(m.global.rolling.rate)} />
-                <Sparkline data={m.global.spark.map((d) => d.rate)} />
-              </div>
-              <span className="overview-note">
-                Rolling completion · through today
-              </span>
-            </button>
+              <dl className="overview-facts">
+                <div>
+                  <dt>Current</dt>
+                  <dd>{days(m.global.streak.current)}</dd>
+                </div>
+                <div>
+                  <dt>Longest</dt>
+                  <dd>{days(m.global.streak.longest)}</dd>
+                </div>
+                <div>
+                  <dt>Practice days</dt>
+                  <dd>{m.global.streak.practiceDays}</dd>
+                </div>
+              </dl>
+              <p className="fine-print">
+                Streaks skip unscheduled days. Today stays open until midnight.
+              </p>
+            </OverviewTile>
+            <OverviewTile
+              id="momentum"
+              open={open === 3}
+              onToggle={() => toggle(3)}
+              icon={<TrendingUp size={16} />}
+              label="30-day momentum"
+              value={<NumberValue value={percent(m.global.rolling.rate)} />}
+              visual={<Sparkline data={m.global.spark.map((d) => d.rate)} />}
+              note="Rolling completion · through today"
+            >
+              <dl className="overview-facts">
+                <div>
+                  <dt>Completed</dt>
+                  <dd>
+                    {m.global.rolling.completed} of {m.global.rolling.scheduled}
+                  </dd>
+                </div>
+                <div>
+                  <dt>Prior 30 days</dt>
+                  <dd>
+                    {m.global.rollingChange === null
+                      ? "No comparison yet"
+                      : `${m.global.rollingChange >= 0 ? "+" : "−"}${Math.abs(m.global.rollingChange).toFixed(1)} pp`}
+                  </dd>
+                </div>
+              </dl>
+            </OverviewTile>
           </div>
         )}
         <main
@@ -601,7 +713,7 @@ export default function Dashboard({
                   title={`${PERIOD_NAMES[mode]} ${mode === "month" ? "progress" : "completion"}`}
                   icon={<Target size={17} />}
                   eyebrow={
-                    m.future ? "UPCOMING" : m.partial ? "TO DATE" : "OVERVIEW"
+                    m.future ? "Upcoming" : m.partial ? "To date" : "Overview"
                   }
                   states={["Completion", "Trend", "Distribution"]}
                   index={states.hero}
@@ -658,13 +770,7 @@ export default function Dashboard({
                           }
                         />
                       </div>
-                      <div className="hero-arc" aria-hidden="true">
-                        <svg viewBox="0 0 240 240">
-                          <circle cx="120" cy="120" r="104" />
-                          <circle cx="120" cy="120" r="84" />
-                          <circle cx="120" cy="120" r="64" />
-                        </svg>
-                      </div>
+                      <DomainRings data={m.distribution} />
                     </div>
                   ) : states.hero === 1 ? (
                     <div className="hero-trend">
@@ -702,14 +808,13 @@ export default function Dashboard({
                       <RateBars
                         rows={m.distribution.map((d) => ({
                           ...d,
-                          label: d.label,
-                          color: DOMAIN_COLORS[d.domain],
+                          color: DOMAIN_TONES[d.domain],
                         }))}
                       />
                       <div className="distribution-counts">
                         {m.distribution.map((d) => (
                           <span key={d.domain}>
-                            <i className={DOMAIN_COLORS[d.domain]} />
+                            <i className={DOMAIN_TONES[d.domain]} />
                             {d.label}
                             <b>{d.completed}</b>
                           </span>
@@ -724,7 +829,7 @@ export default function Dashboard({
                   id="french"
                   title="French"
                   icon={<BookOpen size={17} />}
-                  eyebrow="LEARNING"
+                  eyebrow="Learning"
                   states={["Completion", "Practice days", "Skills"]}
                   index={states.french}
                   onChange={(i) => state("french", i)}
@@ -824,7 +929,7 @@ export default function Dashboard({
                   id="health"
                   title="Health"
                   icon={<Heart size={17} />}
-                  eyebrow="MAKE SPACE"
+                  eyebrow="Wellbeing"
                   states={["Completion", "Walking", "Trend"]}
                   index={states.health}
                   onChange={(i) => state("health", i)}
@@ -837,24 +942,13 @@ export default function Dashboard({
                       <p className="metric-context">
                         A little care goes a long way.
                       </p>
-                      <div className="health-lines" aria-hidden="true">
-                        {Array.from({ length: 22 }, (_, i) => (
-                          <i
-                            key={i}
-                            className={
-                              i < Math.round((m.health.rate ?? 0) * 22)
-                                ? "done"
-                                : ""
-                            }
-                            style={{
-                              height: `${22 + Math.sin(i / 3) * 14 + (i % 3) * 4}px`,
-                            }}
-                          />
-                        ))}
-                      </div>
-                      <span className="metric-context">
+                      <Meter
+                        completed={m.health.completed}
+                        scheduled={m.health.scheduled}
+                      />
+                      <p className="metric-context">
                         {m.health.completed} of {m.health.scheduled} activities
-                      </span>
+                      </p>
                     </div>
                   ) : states.health === 1 ? (
                     <div className="walking-view">
@@ -884,7 +978,7 @@ export default function Dashboard({
                   id="activity"
                   title="Activity rhythm"
                   icon={<ActivityIcon size={17} />}
-                  eyebrow={mode === "year" ? "THE LONG VIEW" : "DAY BY DAY"}
+                  eyebrow={mode === "year" ? "The long view" : "Day by day"}
                   states={["Activity map", "Milestones"]}
                   index={states.activity}
                   onChange={(i) => state("activity", i)}
@@ -973,7 +1067,7 @@ export default function Dashboard({
                   ) : (
                     <div className="best-month-view">
                       <span className="section-kicker">
-                        MOST CONSISTENT MONTH
+                        Most consistent month
                       </span>
                       <h3>
                         {m.mostConsistent
@@ -1021,15 +1115,14 @@ export default function Dashboard({
                   aria-pressed={page === i}
                   onClick={() => setPage(i)}
                 >
-                  <span>{name}</span>
-                  <i />
+                  {name}
                 </button>
               ))}
             </nav>
           )}
           <button className="footer-help" onClick={() => setPanel("help")}>
-            <CircleHelp size={14} />
-            <span>Made for the bigger picture</span>
+            <CircleHelp size={15} />
+            <span>Help</span>
           </button>
           {short && m && (
             <button
@@ -1053,18 +1146,15 @@ export default function Dashboard({
           {panel && (
             <>
               <header className="dialog-heading">
-                <div>
-                  <span className="section-kicker">CADENCE</span>
-                  <h2 id="panel-title">
-                    {panel === "connection"
-                      ? "Your connection"
-                      : panel === "balance"
-                        ? "A balanced routine"
-                        : panel === "overview"
-                          ? "The bigger picture"
-                          : "A little orientation"}
-                  </h2>
-                </div>
+                <h2 id="panel-title">
+                  {panel === "connection"
+                    ? "Connection"
+                    : panel === "balance"
+                      ? "Routine balance"
+                      : panel === "overview"
+                        ? "Overview"
+                        : "Help"}
+                </h2>
                 <button
                   className="icon-button"
                   aria-label="Close details"
@@ -1160,7 +1250,7 @@ export default function Dashboard({
                           <div key={d.domain}>
                             <label htmlFor={`weight-${d.domain}`}>
                               <span
-                                className={`domain-dot ${DOMAIN_COLORS[d.domain]}`}
+                                className={`domain-dot ${DOMAIN_TONES[d.domain]}`}
                               />
                               {d.label}
                               <small>
@@ -1200,6 +1290,18 @@ export default function Dashboard({
                     </p>
                     <div className="dialog-actions">
                       <button
+                        className="text-button"
+                        onClick={() => setDraft(DEFAULT_WEIGHTS)}
+                      >
+                        Reset to defaults
+                      </button>
+                      <button
+                        className="secondary-button"
+                        onClick={() => setPanel(null)}
+                      >
+                        Cancel
+                      </button>
+                      <button
                         className="primary-button"
                         disabled={!validWeights(draft)}
                         onClick={() => {
@@ -1213,13 +1315,7 @@ export default function Dashboard({
                           setPanel(null);
                         }}
                       >
-                        Save balance weights
-                      </button>
-                      <button
-                        className="secondary-button"
-                        onClick={() => setDraft(DEFAULT_WEIGHTS)}
-                      >
-                        Reset
+                        Save
                       </button>
                     </div>
                     <p className="fine-print">
@@ -1298,7 +1394,7 @@ export default function Dashboard({
                         <span>03</span>
                         <p>
                           <b>Keep your existing rhythm</b>Update your tracker as
-                          usual. Cadence checks while this tab is active.
+                          usual. The dashboard checks while this tab is open.
                         </p>
                       </div>
                     </div>

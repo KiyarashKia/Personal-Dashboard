@@ -18,8 +18,8 @@ Set `GOOGLE_SHEET_ID` in `.env.local` to the ID from your spreadsheet URL. No AP
 
 ## Deploy to Vercel or another Next.js host
 
-1. Extract the ZIP. Use its **cadence-dashboard** folder as the project root—the folder containing `package.json`.
-2. Import that folder through your Git provider, or deploy it using the Vercel CLI. Vercel detects Next.js; `vercel.json` also records the build settings.
+1. Use the repository root, the folder containing `package.json`, as the project root.
+2. Import the repository through your Git provider, or deploy it using the Vercel CLI. Vercel detects Next.js; `vercel.json` also records the build settings.
 3. Add `GOOGLE_SHEET_ID` and any required server environment variables from `.env.example` in the host's settings. Spreadsheet IDs and credentials are intentionally not included in this repository.
 4. Deploy. If you change an environment variable later, redeploy to apply it.
 

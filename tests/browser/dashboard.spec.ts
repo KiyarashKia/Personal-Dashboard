@@ -92,15 +92,22 @@ test("dialogs, keyboard controls, reduced motion and offline recovery", async ({
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/");
   await expect(page.locator("[data-card=hero]")).toBeVisible();
+  const tile = page.getByRole("button", { name: /Routine balance/ });
+  await tile.click();
+  await expect(tile).toHaveAttribute("aria-expanded", "true");
+  await expect(page.getByRole("dialog")).not.toBeVisible();
+  await contain(page, "mobile expanded tile");
+  await page.keyboard.press("Escape");
+  await expect(tile).toHaveAttribute("aria-expanded", "false");
   await page.getByRole("button", { name: "Dashboard settings" }).click();
   await expect(page.getByRole("dialog")).toBeVisible();
   await contain(page, "mobile balance dialog");
   await page.locator("#weight-health").fill("20");
   await expect(
-    page.getByRole("button", { name: "Save balance weights" }),
+    page.getByRole("button", { name: "Save", exact: true }),
   ).toBeDisabled();
-  await page.getByRole("button", { name: "Reset", exact: true }).click();
-  await page.getByRole("button", { name: "Save balance weights" }).click();
+  await page.getByRole("button", { name: "Reset to defaults" }).click();
+  await page.getByRole("button", { name: "Save", exact: true }).click();
   await page.getByRole("button", { name: /Open connection details/ }).click();
   await contain(page, "mobile connection dialog");
   await page.keyboard.press("Escape");
@@ -137,7 +144,10 @@ test("server response contains actual metrics before JavaScript runs", async ({
     "opacity",
     "1",
   );
-  await expect(page.locator(".progress-ring")).toHaveCSS("box-shadow", "none");
+  await expect(page.locator("[data-card=french] .progress-ring")).toHaveCSS(
+    "box-shadow",
+    "none",
+  );
   await page.goto("/?mode=day&date=2026-10-20");
   await expect(
     page.getByRole("heading", { name: "Daily completion" }),
