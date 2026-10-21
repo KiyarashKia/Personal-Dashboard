@@ -9,8 +9,7 @@
     "start": "next start --hostname 127.0.0.1",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:e2e": "playwright test",
-    "package": "node scripts/package.mjs"
+    "test:e2e": "playwright test"
   },
   "engines": {
     "node": ">=22.0.0"

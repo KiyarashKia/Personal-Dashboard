@@ -1,5 +1,17 @@
+# Dependencies
 node_modules/
+
+# Next.js build output and generated types
 .next/
+out/
+build/
+next-env.d.ts
+*.tsbuildinfo
+
+# Vercel
+.vercel/
+
+# Environment and credentials
 .env*
 !.env.example
 *.pem
@@ -10,7 +22,24 @@ node_modules/
 *.keystore
 *credentials*.json
 *service*account*.json
+
+# Test output
+coverage/
 playwright-report/
 test-results/
-*.tsbuildinfo
+blob-report/
+playwright/.cache/
+
+# Logs and caches
+*.log
+.eslintcache
+
+# Archives
 *.zip
+
+# OS and editor files
+.DS_Store
+Thumbs.db
+desktop.ini
+.idea/
+.vscode/
