@@ -48,6 +48,13 @@ for (const [width, height] of [
     await page.setViewportSize({ width, height });
     const errors: string[] = [];
     page.on("pageerror", (error) => errors.push(error.message));
+    page.on("console", (message) => {
+      if (
+        message.type() === "error" &&
+        /hydration|hydrated/i.test(message.text())
+      )
+        errors.push(message.text());
+    });
     await page.goto("/");
     await expect(page.locator("[data-card=hero]")).toBeVisible();
     const compact = width < 1100 || height < 650;
