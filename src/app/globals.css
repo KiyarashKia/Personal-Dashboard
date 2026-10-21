@@ -1013,6 +1013,9 @@ h1 {
   }
 }
 @container (max-height: 300px) {
+  .hero-completion {
+    row-gap: 0;
+  }
   .hero-completion .domain-rings > * {
     display: none;
   }
