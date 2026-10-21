@@ -90,10 +90,10 @@ test("dialogs, keyboard controls, reduced motion and offline recovery", async ({
   await contain(page, "mobile balance dialog");
   await page.locator("#weight-health").fill("20");
   await expect(
-    page.getByRole("button", { name: "Save balance weights" }),
+    page.getByRole("button", { name: "Save", exact: true }),
   ).toBeDisabled();
-  await page.getByRole("button", { name: "Reset", exact: true }).click();
-  await page.getByRole("button", { name: "Save balance weights" }).click();
+  await page.getByRole("button", { name: "Reset to defaults" }).click();
+  await page.getByRole("button", { name: "Save", exact: true }).click();
   await page.getByRole("button", { name: /Open connection details/ }).click();
   await contain(page, "mobile connection dialog");
   await page.keyboard.press("Escape");

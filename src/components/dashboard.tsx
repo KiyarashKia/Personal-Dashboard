@@ -37,12 +37,19 @@ import {
 import { computeMetrics, percent, validWeights } from "@/lib/metrics";
 import {
   DEFAULT_WEIGHTS,
-  DOMAIN_NAMES,
   type DataResponse,
   type Mode,
   type Weights,
 } from "@/lib/types";
-import { Ring, Sparkline, TrendChart, Heatmap } from "./charts";
+import {
+  DOMAIN_TONES,
+  DomainBars,
+  DomainRings,
+  Heatmap,
+  Ring,
+  Sparkline,
+  TrendChart,
+} from "./charts";
 import { Card } from "./card";
 
 const MODES: Mode[] = ["day", "week", "month", "year"];
@@ -59,12 +66,6 @@ const PERIOD_NAMES: Record<Mode, string> = {
   week: "Weekly",
   month: "Monthly",
   year: "Yearly",
-};
-const DOMAIN_COLORS: Record<string, string> = {
-  learning: "blue",
-  health: "mint",
-  career: "lavender",
-  admin: "amber",
 };
 async function fetcher(url: string): Promise<DataResponse> {
   const res = await fetch(url, { cache: "no-store" }),
@@ -150,15 +151,6 @@ function RateBars({
         </div>
       ))}
     </div>
-  );
-}
-function EmptyRate({ scheduled }: { scheduled: number }) {
-  return (
-    <p className="metric-context">
-      {scheduled
-        ? `${scheduled} scheduled activities`
-        : "No scheduled activities in this period"}
-    </p>
   );
 }
 
@@ -421,10 +413,7 @@ export default function Dashboard({
           </div>
         </header>
         <div className="title-row">
-          <div>
-            <div className="section-kicker">THE BIGGER PICTURE</div>
-            <h1>{TITLES[mode]}</h1>
-          </div>
+          <h1>{TITLES[mode]}</h1>
           <div className="period-picker">
             <button
               className="icon-button"
@@ -456,6 +445,11 @@ export default function Dashboard({
             </button>
             <button
               className="today-button"
+              disabled={
+                !dataset ||
+                periodFor(mode, anchor).start ===
+                  periodFor(mode, dataset.today).start
+              }
               onClick={() => {
                 setAnchor(dataset?.today ?? anchor);
                 updateURL(mode, dataset?.today ?? anchor);
@@ -503,12 +497,7 @@ export default function Dashboard({
                   value={m.global.balance.score ?? "—"}
                   unit="/ 100"
                 />
-                <span className="balance-orbit" aria-hidden="true">
-                  <i />
-                  <i />
-                  <i />
-                  <i />
-                </span>
+                <DomainBars data={m.global.balance.domains} />
               </div>
               <span className="overview-note">{m.global.balance.phrase}</span>
             </button>
@@ -601,7 +590,7 @@ export default function Dashboard({
                   title={`${PERIOD_NAMES[mode]} ${mode === "month" ? "progress" : "completion"}`}
                   icon={<Target size={17} />}
                   eyebrow={
-                    m.future ? "UPCOMING" : m.partial ? "TO DATE" : "OVERVIEW"
+                    m.future ? "Upcoming" : m.partial ? "To date" : "Overview"
                   }
                   states={["Completion", "Trend", "Distribution"]}
                   index={states.hero}
@@ -658,13 +647,7 @@ export default function Dashboard({
                           }
                         />
                       </div>
-                      <div className="hero-arc" aria-hidden="true">
-                        <svg viewBox="0 0 240 240">
-                          <circle cx="120" cy="120" r="104" />
-                          <circle cx="120" cy="120" r="84" />
-                          <circle cx="120" cy="120" r="64" />
-                        </svg>
-                      </div>
+                      <DomainRings data={m.distribution} />
                     </div>
                   ) : states.hero === 1 ? (
                     <div className="hero-trend">
@@ -702,14 +685,13 @@ export default function Dashboard({
                       <RateBars
                         rows={m.distribution.map((d) => ({
                           ...d,
-                          label: d.label,
-                          color: DOMAIN_COLORS[d.domain],
+                          color: DOMAIN_TONES[d.domain],
                         }))}
                       />
                       <div className="distribution-counts">
                         {m.distribution.map((d) => (
                           <span key={d.domain}>
-                            <i className={DOMAIN_COLORS[d.domain]} />
+                            <i className={DOMAIN_TONES[d.domain]} />
                             {d.label}
                             <b>{d.completed}</b>
                           </span>
@@ -724,7 +706,7 @@ export default function Dashboard({
                   id="french"
                   title="French"
                   icon={<BookOpen size={17} />}
-                  eyebrow="LEARNING"
+                  eyebrow="Learning"
                   states={["Completion", "Practice days", "Skills"]}
                   index={states.french}
                   onChange={(i) => state("french", i)}
@@ -824,7 +806,7 @@ export default function Dashboard({
                   id="health"
                   title="Health"
                   icon={<Heart size={17} />}
-                  eyebrow="MAKE SPACE"
+                  eyebrow="Wellbeing"
                   states={["Completion", "Walking", "Trend"]}
                   index={states.health}
                   onChange={(i) => state("health", i)}
@@ -832,29 +814,14 @@ export default function Dashboard({
                   motionKey={stateKey}
                 >
                   {states.health === 0 ? (
-                    <div className="health-view">
-                      <NumberValue value={percent(m.health.rate)} />
+                    <div className="centered-metric">
+                      <Ring value={m.health.rate} color="mint">
+                        <NumberValue value={percent(m.health.rate)} />
+                        <span>consistency</span>
+                      </Ring>
                       <p className="metric-context">
-                        A little care goes a long way.
-                      </p>
-                      <div className="health-lines" aria-hidden="true">
-                        {Array.from({ length: 22 }, (_, i) => (
-                          <i
-                            key={i}
-                            className={
-                              i < Math.round((m.health.rate ?? 0) * 22)
-                                ? "done"
-                                : ""
-                            }
-                            style={{
-                              height: `${22 + Math.sin(i / 3) * 14 + (i % 3) * 4}px`,
-                            }}
-                          />
-                        ))}
-                      </div>
-                      <span className="metric-context">
                         {m.health.completed} of {m.health.scheduled} activities
-                      </span>
+                      </p>
                     </div>
                   ) : states.health === 1 ? (
                     <div className="walking-view">
@@ -884,7 +851,7 @@ export default function Dashboard({
                   id="activity"
                   title="Activity rhythm"
                   icon={<ActivityIcon size={17} />}
-                  eyebrow={mode === "year" ? "THE LONG VIEW" : "DAY BY DAY"}
+                  eyebrow={mode === "year" ? "The long view" : "Day by day"}
                   states={["Activity map", "Milestones"]}
                   index={states.activity}
                   onChange={(i) => state("activity", i)}
@@ -973,7 +940,7 @@ export default function Dashboard({
                   ) : (
                     <div className="best-month-view">
                       <span className="section-kicker">
-                        MOST CONSISTENT MONTH
+                        Most consistent month
                       </span>
                       <h3>
                         {m.mostConsistent
@@ -1021,15 +988,14 @@ export default function Dashboard({
                   aria-pressed={page === i}
                   onClick={() => setPage(i)}
                 >
-                  <span>{name}</span>
-                  <i />
+                  {name}
                 </button>
               ))}
             </nav>
           )}
           <button className="footer-help" onClick={() => setPanel("help")}>
-            <CircleHelp size={14} />
-            <span>Made for the bigger picture</span>
+            <CircleHelp size={15} />
+            <span>Help</span>
           </button>
           {short && m && (
             <button
@@ -1053,18 +1019,15 @@ export default function Dashboard({
           {panel && (
             <>
               <header className="dialog-heading">
-                <div>
-                  <span className="section-kicker">CADENCE</span>
-                  <h2 id="panel-title">
-                    {panel === "connection"
-                      ? "Your connection"
-                      : panel === "balance"
-                        ? "A balanced routine"
-                        : panel === "overview"
-                          ? "The bigger picture"
-                          : "A little orientation"}
-                  </h2>
-                </div>
+                <h2 id="panel-title">
+                  {panel === "connection"
+                    ? "Connection"
+                    : panel === "balance"
+                      ? "Routine balance"
+                      : panel === "overview"
+                        ? "Overview"
+                        : "Help"}
+                </h2>
                 <button
                   className="icon-button"
                   aria-label="Close details"
@@ -1160,7 +1123,7 @@ export default function Dashboard({
                           <div key={d.domain}>
                             <label htmlFor={`weight-${d.domain}`}>
                               <span
-                                className={`domain-dot ${DOMAIN_COLORS[d.domain]}`}
+                                className={`domain-dot ${DOMAIN_TONES[d.domain]}`}
                               />
                               {d.label}
                               <small>
@@ -1200,6 +1163,18 @@ export default function Dashboard({
                     </p>
                     <div className="dialog-actions">
                       <button
+                        className="text-button"
+                        onClick={() => setDraft(DEFAULT_WEIGHTS)}
+                      >
+                        Reset to defaults
+                      </button>
+                      <button
+                        className="secondary-button"
+                        onClick={() => setPanel(null)}
+                      >
+                        Cancel
+                      </button>
+                      <button
                         className="primary-button"
                         disabled={!validWeights(draft)}
                         onClick={() => {
@@ -1213,13 +1188,7 @@ export default function Dashboard({
                           setPanel(null);
                         }}
                       >
-                        Save balance weights
-                      </button>
-                      <button
-                        className="secondary-button"
-                        onClick={() => setDraft(DEFAULT_WEIGHTS)}
-                      >
-                        Reset
+                        Save
                       </button>
                     </div>
                     <p className="fine-print">
@@ -1298,7 +1267,7 @@ export default function Dashboard({
                         <span>03</span>
                         <p>
                           <b>Keep your existing rhythm</b>Update your tracker as
-                          usual. Cadence checks while this tab is active.
+                          usual. The dashboard checks while this tab is open.
                         </p>
                       </div>
                     </div>

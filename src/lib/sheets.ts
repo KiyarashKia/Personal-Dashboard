@@ -452,6 +452,6 @@ export async function getDashboardData(): Promise<DataResponse> {
 export function invalidateDashboard(sheetId: string, structure = false) {
   revalidateTag(`cadence-data-${sheetId}`, { expire: 0 });
   if (structure) revalidateTag(`cadence-tabs-${sheetId}`, { expire: 0 });
-  for (const [key, cache] of caches)
+  for (const cache of caches.values())
     if (cache.data?.sheetId === sheetId) cache.fetched = 0;
 }
