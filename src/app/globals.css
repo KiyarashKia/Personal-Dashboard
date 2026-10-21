@@ -1589,10 +1589,13 @@ h1 {
     display: none;
   }
 }
-@container (max-height: 260px) {
+/* The counts repeat the bars' numbers, so they go first. */
+@container (max-height: 320px) {
   .distribution-counts {
     display: none;
   }
+}
+@container (max-height: 260px) {
   .rate-bars {
     gap: 8px;
   }
