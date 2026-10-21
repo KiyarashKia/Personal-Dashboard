@@ -53,8 +53,8 @@ const meta = {
 beforeEach(() => {
   vi.resetModules();
   cache.clear();
-  delete (globalThis as { cadenceSheetCache?: unknown }).cadenceSheetCache;
-  delete (globalThis as { cadenceReadBudgets?: unknown }).cadenceReadBudgets;
+  delete (globalThis as { pintelliSheetCache?: unknown }).pintelliSheetCache;
+  delete (globalThis as { pintelliReadBudgets?: unknown }).pintelliReadBudgets;
   vi.useFakeTimers();
   vi.setSystemTime(new Date("2026-10-20T16:00:00Z"));
   vi.stubEnv("GOOGLE_SHEET_ID", "unit-test-source");

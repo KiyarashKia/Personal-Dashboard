@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 export const metadata: Metadata = {
-  title: "Cadence — Personal Intelligence",
+  title: "Pintelli — Personal Intelligence",
   description:
     "A little perspective on the routines that matter. One screen. Four perspectives.",
   robots: { index: false, follow: false },

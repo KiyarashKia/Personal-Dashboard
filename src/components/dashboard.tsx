@@ -40,6 +40,7 @@ import {
   DEFAULT_WEIGHTS,
   type DataResponse,
   type Mode,
+  type Rate,
   type Weights,
 } from "@/lib/types";
 import {
@@ -156,6 +157,11 @@ function RateBars({
   );
 }
 
+/** Done against what is due so far, plus what is still ahead in the period. */
+function countNote({ completed, scheduled }: Rate, planned: number) {
+  if (!scheduled) return planned ? `${planned} planned` : "Nothing scheduled";
+  return `${completed} of ${scheduled} due${planned > scheduled ? ` · ${planned} planned` : ""}`;
+}
 function days(n: number) {
   return `${n} ${n === 1 ? "day" : "days"}`;
 }
@@ -291,7 +297,10 @@ export default function Dashboard({
       setAnchor(date);
     try {
       const stored = JSON.parse(
-        localStorage.getItem("cadence-balance-weights") ?? "null",
+        localStorage.getItem("pintelli-balance-weights") ??
+          // Weights saved before the rename.
+          localStorage.getItem("cadence-balance-weights") ??
+          "null",
       );
       if (validWeights(stored)) {
         setWeights(stored);
@@ -585,7 +594,7 @@ export default function Dashboard({
                       {d.label}
                     </dt>
                     <dd>
-                      {d.rate === null ? "Not tracked" : percent(d.rate)}
+                      {d.rate === null ? "Not scheduled" : percent(d.rate)}
                       <small>{d.weight}% weight</small>
                     </dd>
                   </div>
@@ -747,8 +756,11 @@ export default function Dashboard({
                           <div>
                             activities completed
                             <small>
-                              of {m.performance.scheduled} scheduled{" "}
-                              {m.partial ? "so far" : ""}
+                              {m.performance.scheduled
+                                ? `of ${m.performance.scheduled} ${m.partial ? "due so far" : "scheduled"}`
+                                : "nothing due yet"}
+                              {m.planned.all > m.performance.scheduled &&
+                                ` · ${m.planned.all} planned`}
                             </small>
                           </div>
                         </div>
@@ -843,7 +855,7 @@ export default function Dashboard({
                         <span>consistency</span>
                       </Ring>
                       <p className="metric-context">
-                        {m.french.completed} of {m.french.scheduled} activities
+                        {countNote(m.french, m.planned.french)}
                       </p>
                     </div>
                   ) : states.french === 1 ? (
@@ -944,7 +956,7 @@ export default function Dashboard({
                       </p>
                       <Meter rate={m.health.rate} />
                       <p className="metric-context">
-                        {m.health.completed} of {m.health.scheduled} activities
+                        {countNote(m.health, m.planned.health)}
                       </p>
                     </div>
                   ) : states.health === 1 ? (
@@ -1252,7 +1264,7 @@ export default function Dashboard({
                               {d.label}
                               <small>
                                 {d.rate === null
-                                  ? "Not tracked"
+                                  ? "Not scheduled"
                                   : `${percent(d.rate)} · ${d.completed}/${d.scheduled}`}
                               </small>
                             </label>
@@ -1305,7 +1317,7 @@ export default function Dashboard({
                           setWeights(draft);
                           try {
                             localStorage.setItem(
-                              "cadence-balance-weights",
+                              "pintelli-balance-weights",
                               JSON.stringify(draft),
                             );
                           } catch {}

@@ -9,6 +9,7 @@ import { normalize, parseCSV } from "../src/lib/normalize";
 import {
   computeMetrics,
   habitRankings,
+  percent,
   rateOf,
   routineBalance,
   streaks,
@@ -210,10 +211,47 @@ describe("pure KPI rules", () => {
     expect(result.score).toBe(61);
     expect(result.coverage).toBeCloseTo(0.65);
     expect(result.participation).toBe(0.5);
-    expect(routineBalance(all.slice(0, 3), "2026-10-20").score).toBeNull();
-    expect(routineBalance(all.slice(0, 3), "2026-10-20").missing).toEqual([
-      "Life admin",
-    ]);
+    // An area with nothing scheduled is left out and the other weights rescale:
+    // coverage (35 + 30) / 90, participation 2 of 3.
+    const three = routineBalance(all.slice(0, 3), "2026-10-20");
+    expect(three.coverage).toBeCloseTo(65 / 90);
+    expect(three.participation).toBeCloseTo(2 / 3);
+    expect(three.score).toBe(71);
+    expect(three.missing).toEqual(["Life admin"]);
+    expect(routineBalance(all.slice(0, 1), "2026-10-20").score).toBeNull();
+  });
+  it("never rounds a partial rate up to 100% or down to 0%", () => {
+    expect(percent(199 / 200)).toBe("99%");
+    expect(percent(1 / 300)).toBe("1%");
+    expect(percent(1)).toBe("100%");
+    expect(percent(0)).toBe("0%");
+    expect(percent(0.5)).toBe("50%");
+  });
+  it("separates what is due so far from everything planned in the period", () => {
+    const m = computeMetrics(
+      [
+        task("2026-10-20", true),
+        task("2026-10-21", false, "health"),
+        task("2026-11-03", false),
+        task("2026-12-31", false, "health"),
+        task("2027-01-01", false),
+      ],
+      "year",
+      "2026-10-21",
+      "2026-10-21",
+    );
+    expect(m.performance).toEqual({ completed: 1, scheduled: 2, rate: 0.5 });
+    expect(m.planned).toEqual({ all: 4, french: 2, health: 2 });
+  });
+  it("labels each week bar by its first day inside the period", () => {
+    const m = computeMetrics(
+      [task("2026-10-01", true)],
+      "month",
+      "2026-10-01",
+      "2026-10-31",
+    );
+    expect(m.trend[0].date).toBe("2026-10-01");
+    expect(m.trend[1].date).toBe("2026-10-04");
   });
   it("counts walking days rather than checkboxes", () => {
     const rows = [

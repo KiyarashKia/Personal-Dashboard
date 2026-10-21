@@ -138,7 +138,7 @@ test("server response contains actual metrics before JavaScript runs", async ({
     page.getByRole("heading", { name: "Monthly progress" }),
   ).toBeVisible();
   await expect(page.locator("[data-card=hero] .hero-count")).toContainText(
-    "scheduled",
+    "due",
   );
   await expect(page.locator("[data-card=hero] .card-body")).toHaveCSS(
     "opacity",

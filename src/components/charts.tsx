@@ -116,12 +116,18 @@ export function Sparkline({
   data: (number | null)[];
   color?: string;
 }) {
-  const points = data
+  // Days with nothing scheduled break the line instead of plotting as 0%.
+  const step = 160 / Math.max(1, data.length - 1);
+  const path = data
     .map(
       (n, i) =>
-        `${(i * 160) / Math.max(1, data.length - 1)},${38 - (n ?? 0) * 32}`,
+        n === null
+          ? ""
+          : i && data[i - 1] !== null
+            ? `L${i * step} ${38 - n * 32}`
+            : `M${i * step} ${38 - n * 32}h0`, // h0 keeps a lone day visible
     )
-    .join(" ");
+    .join("");
   return (
     <svg
       className={`sparkline ${color}`}
@@ -129,7 +135,7 @@ export function Sparkline({
       aria-hidden="true"
     >
       <path d="M0 38H164" className="spark-baseline" />
-      <polyline points={points} className="spark-path" />
+      <path d={path} className="spark-path" />
     </svg>
   );
 }

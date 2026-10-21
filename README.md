@@ -1,4 +1,4 @@
-# Cadence
+# Pintelli
 
 A single-screen personal intelligence dashboard for your Google Sheets tracker. Server-rendered first view, four perspectives, interactive cards, and a viewport-fitted layout.
 
@@ -80,20 +80,78 @@ Unknown categories still count toward overall progress; balance reports an expli
 
 Leave `GOOGLE_SHEET_RANGES` empty for automatic discovery. To intentionally limit the source, supply a JSON array of full ranges beginning at A1, such as `["'Oct 2026'!A1:AG85"]`. Explicit ranges are an intentional cap: increase their end row when you add rows, or return to automatic discovery.
 
-## Correctness rules
+## How the numbers are calculated
 
-- Only actual scheduled opportunities enter denominators. Future dates do not reduce current completion.
-- The configured timezone defaults to **America/Toronto**. Weeks run Sunday–Saturday.
-- Empty denominators display **—**, never a fabricated 0%.
-- In-progress comparisons use equivalent elapsed prior periods; rate differences are percentage points.
-- Full days require at least one scheduled task. French streaks count scheduled practice days and leave today open until midnight.
-- Habit rankings require at least three scheduled opportunities and compare normalized completion rates.
-- Routine balance uses the supplied coverage/participation formula. An untracked domain makes the score unavailable; it is never assumed complete. Weights can be changed in settings and are stored only in that browser.
-- Overlapping identical activities count once. Conflicting duplicate states fail visibly instead of silently picking a value.
+Every number comes from the checkbox cells in the monthly tabs. Nothing is estimated or filled in.
+
+### Ground rules
+
+- **One cell is one activity.** A checkbox on a date means that activity is scheduled for that day. `TRUE` is done, `FALSE` is not done yet, and a blank cell is not scheduled and is never counted.
+- **Due versus planned.** An activity is _due_ once its date is today or earlier in the dashboard's timezone (America/Toronto by default). _Planned_ means everything scheduled in the period, including dates still ahead. Completion rates always use what is due, so a year you are ten months into is not scored against December's tasks. The cards show both counts, for example "6 of 14 due · 420 planned".
+- **Today counts as due.** Today's unchecked activities are part of the denominator, so a rate rises as you check things off during the day. The one exception is the French streak (below).
+- **Weeks run Sunday to Saturday.**
+- **Nothing due shows "—".** A period with no due activities has no rate. It never shows 0%.
+- **Percentages are whole numbers that don't overstate.** 100% appears only when everything due is done, and 0% only when nothing is. For example, 199 of 200 shows 99%, not 100%.
+- **Duplicates count once.** If the same activity appears twice for the same date with the same state, it counts once. If the two copies disagree, the dashboard shows an error and doesn't pick one.
+
+### Period cards
+
+These follow the Day, Week, Month or Year you select.
+
+| Metric            | Calculation                                                                                                                                                      | Why                                                                                                                    |
+| ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| Completion        | Activities done ÷ activities due in the period                                                                                                                   | The plain share of what you set out to do and could already have done.                                                 |
+| Change            | This period's rate minus the previous period's, in percentage points. A period in progress is compared with the same number of elapsed days in the previous one. | Comparing 21 days of October with all 30 days of September would be unfair to October.                                 |
+| Trend             | Day and Week show each day. Month shows each Sunday-to-Saturday week, labelled by its first day inside the month. Year shows each month.                         | Each bar covers a span long enough to be meaningful at that zoom level.                                                |
+| Areas             | Completion within French, Health, Career and Life admin                                                                                                          | Shows where the period's effort went.                                                                                  |
+| French completion | French activities done ÷ French activities due                                                                                                                   |                                                                                                                        |
+| Practice days     | Dates with at least one French activity done                                                                                                                     | Practice is about showing up. Three exercises on one day are still one practice day.                                   |
+| Skills            | Completion for French activities whose label names grammar, listening, speaking, reading or writing                                                              |                                                                                                                        |
+| Health completion | Health activities done ÷ Health activities due                                                                                                                   |                                                                                                                        |
+| Health meter      | 24 bars that rise from short to tall. The number lit is the completion rate × 24, rounded.                                                                       | A fixed scale looks the same whether you have 3 health activities or 60, so it reads as progress, not as a task count. |
+| Walking           | Days with a Health activity whose label contains "walk" and at least one of them done ÷ days with one scheduled                                                  | Walking is a daily habit. Two walk entries on one day count as one walking day.                                        |
+| Activity map      | Each day's completion: blank if nothing is scheduled, level 0 if nothing is done, levels 1–4 by quarter of completion, level 5 when everything is done           | Quarters keep the colour steps even, and "all done" gets its own level so a full day stands out.                       |
+| Full days         | Days with at least one activity due where every one is done                                                                                                      | A day with nothing scheduled can't be a full day.                                                                      |
+| Habit spotlight   | Completion per activity label. A habit needs at least 3 due before it is ranked.                                                                                 | Fewer than 3 chances makes a 100% or 0% meaningless.                                                                   |
+| Best month        | The month in the selected year with the highest completion. Ties go to the earlier month.                                                                        |                                                                                                                        |
+
+### Overview tiles
+
+These always run up to today, whichever period you select.
+
+**Overall progress.** All activities done ÷ all activities due, across every tab.
+
+**30-day momentum.** Completion over the last 30 days including today, compared with the 30 days before that in percentage points. The sparkline shows each day's rate and leaves a gap on days with nothing scheduled, instead of drawing them as 0%.
+
+**French streak.** The number of French days in a row on which at least one French activity was done. Only days with French scheduled count, so a planned day off doesn't break the streak. Today stays open until midnight, so an unfinished French task today doesn't reset it. Longest is the best run on record.
+
+**Routine balance (0–100).** A single number for how evenly your routine covers its four areas over the last 30 days including today.
+
+1. For each area _a_, take its completion rate _r_ and its weight _w_. The default weights are Health 35, French 30, Career 25 and Life admin 10. You can change them in settings; they must total 100 and are saved only in that browser.
+2. An area with nothing scheduled in those 30 days is left out, and the remaining weights are rescaled. An area you didn't plan for neither helps nor hurts the score.
+3. **Coverage** = Σ(_w_ × _r_) ÷ Σ*w*, the weighted completion across the included areas.
+4. **Participation** = the share of included areas with at least one activity done.
+5. **Score** = round(100 × (0.7 × coverage + 0.3 × participation)). With fewer than two areas scheduled there is nothing to balance, and the score shows "—".
+
+Coverage carries most of the weight because consistency is what matters. Participation adds a penalty for dropping an area completely: an area at 0% costs its share of coverage _and_ its share of participation. That makes skipping something entirely worse than doing it badly.
+
+For example, with default weights, Health and French fully done and Career and Life admin at 0%:
+
+- coverage = (35 + 30) ÷ 100 = 0.65;
+- participation = 2 ÷ 4 = 0.5;
+- score = round(100 × (0.455 + 0.15)) = 61.
+
+If Life admin had nothing scheduled that month, it would be left out:
+
+- coverage = 65 ÷ 90 ≈ 0.72;
+- participation = 2 ÷ 3;
+- score = 71.
+
+A score of 80 or more reads "Balanced routine". Below that, the tile names the area with the lowest completion. This is a routine indicator, not a measure of wellbeing.
 
 ## Free-quota behavior
 
-Cadence intentionally leaves headroom. API polling normally uses about four data reads plus one metadata read per minute, beneath Google's published 60/user/minute and 300/project/minute limits. It adds an eight-read/minute process circuit breaker, a shared Next.js Data Cache, concurrent-request deduplication, and a 45-request/minute circuit breaker for public exports. Hidden/offline tabs pause polling. Focus and reconnection reuse the same server cache.
+Pintelli intentionally leaves headroom. API polling normally uses about four data reads plus one metadata read per minute, beneath Google's published 60/user/minute and 300/project/minute limits. It adds an eight-read/minute process circuit breaker, a shared Next.js Data Cache, concurrent-request deduplication, and a 45-request/minute circuit breaker for public exports. Hidden/offline tabs pause polling. Focus and reconnection reuse the same server cache.
 
 Quota or temporary-unavailability responses honor `Retry-After`, then use increasing cooldowns. During the cooldown, the app does not keep retrying Google, and successful data stays visible. Budgets reset automatically. Cached values show their real last-read time.
 

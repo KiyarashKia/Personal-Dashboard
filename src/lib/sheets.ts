@@ -23,11 +23,11 @@ type Cache = {
   pending?: Promise<DataResponse>;
 };
 const globalCache = globalThis as typeof globalThis & {
-  cadenceSheetCache?: Map<string, Cache>;
-  cadenceReadBudgets?: Map<string, ReadBudget>;
+  pintelliSheetCache?: Map<string, Cache>;
+  pintelliReadBudgets?: Map<string, ReadBudget>;
 };
-const caches = (globalCache.cadenceSheetCache ??= new Map());
-const budgets = (globalCache.cadenceReadBudgets ??= new Map());
+const caches = (globalCache.pintelliSheetCache ??= new Map());
+const budgets = (globalCache.pintelliReadBudgets ??= new Map());
 export class SourceError extends Error {
   constructor(
     message: string,
@@ -268,8 +268,8 @@ async function loadRanges(
               };
             }[];
           },
-        ["cadence-tab-metadata-v2", config.sheetId],
-        { revalidate: 60, tags: [`cadence-tabs-${config.sheetId}`] },
+        ["pintelli-tab-metadata-v2", config.sheetId],
+        { revalidate: 60, tags: [`pintelli-tabs-${config.sheetId}`] },
       )();
       ranges = meta.sheets
         .filter((s) => monthFromTitle(s.properties.title))
@@ -300,8 +300,8 @@ async function loadRanges(
       );
       return parsePublicTabs(await (await request(url)).text());
     },
-    ["cadence-public-tab-index-v2", config.sheetId],
-    { revalidate: 60, tags: [`cadence-tabs-${config.sheetId}`] },
+    ["pintelli-public-tab-index-v2", config.sheetId],
+    { revalidate: 60, tags: [`pintelli-tabs-${config.sheetId}`] },
   )();
   if (tabs.length > 40)
     throw new SourceError(
@@ -412,10 +412,10 @@ export async function getDashboardData(): Promise<DataResponse> {
             syncMode: config.syncMode,
           } satisfies Dataset;
         },
-        ["cadence-live-source-v4", key],
+        ["pintelli-live-source-v4", key],
         {
           revalidate: config.sourceTTL,
-          tags: [`cadence-data-${config.sheetId}`],
+          tags: [`pintelli-data-${config.sheetId}`],
         },
       )();
       data.today = todayInZone(config.timezone);
@@ -450,8 +450,8 @@ export async function getDashboardData(): Promise<DataResponse> {
   return entry.pending;
 }
 export function invalidateDashboard(sheetId: string, structure = false) {
-  revalidateTag(`cadence-data-${sheetId}`, { expire: 0 });
-  if (structure) revalidateTag(`cadence-tabs-${sheetId}`, { expire: 0 });
+  revalidateTag(`pintelli-data-${sheetId}`, { expire: 0 });
+  if (structure) revalidateTag(`pintelli-tabs-${sheetId}`, { expire: 0 });
   for (const cache of caches.values())
     if (cache.data?.sheetId === sheetId) cache.fetched = 0;
 }

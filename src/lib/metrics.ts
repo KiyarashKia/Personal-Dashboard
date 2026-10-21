@@ -9,8 +9,12 @@ import type {
   Weights,
 } from "./types";
 import { DEFAULT_WEIGHTS, DOMAIN_NAMES } from "./types";
-export const percent = (value: number | null) =>
-  value === null ? "—" : `${Math.round(value * 100)}%`;
+/** Whole percent that never rounds a partial result up to 100% or down to 0%. */
+export function percent(value: number | null) {
+  if (value === null) return "—";
+  const n = Math.round(value * 100);
+  return `${value > 0 && value < 1 ? Math.min(99, Math.max(1, n)) : n}%`;
+}
 export function rateOf(activities: Activity[]): Rate {
   const completed = activities.filter((a) => a.completed).length,
     scheduled = activities.length;
@@ -107,29 +111,33 @@ export function routineBalance(
       ...rateOf(recent.filter((a) => a.domain === domain)),
     }),
   );
-  const missing = domains.filter((d) => d.rate === null).map((d) => d.label);
-  const coverage = domains.reduce(
-    (sum, d) => sum + ((d.rate ?? 0) * d.weight) / 100,
-    0,
-  );
-  const participation = domains.filter((d) => d.completed > 0).length / 4;
-  const score = missing.length
-    ? null
-    : Math.round(100 * (0.7 * coverage + 0.3 * participation) + 1e-9);
-  const weakest = [...domains]
-    .filter((d) => d.rate !== null)
-    .sort((a, b) => a.rate! - b.rate!)[0];
-  const phrase = missing.length
-    ? `${4 - missing.length} of 4 domains tracked`
-    : score! >= 80
-      ? "Balanced routine"
-      : weakest?.domain === "health"
-        ? "Health needs attention"
-        : weakest?.domain === "learning"
-          ? "Make room for French"
-          : score === 0
-            ? "A fresh start"
-            : `${weakest?.label ?? "Routine"} needs attention`;
+  // Areas with nothing scheduled in the window are left out and the remaining
+  // weights are rescaled, so an unscheduled area neither helps nor hurts.
+  const tracked = domains.filter((d) => d.rate !== null),
+    missing = domains.filter((d) => d.rate === null).map((d) => d.label),
+    weight = tracked.reduce((sum, d) => sum + d.weight, 0);
+  const coverage = weight
+    ? tracked.reduce((sum, d) => sum + d.rate! * d.weight, 0) / weight
+    : 0;
+  const participation = tracked.length
+    ? tracked.filter((d) => d.completed > 0).length / tracked.length
+    : 0;
+  // Balance needs at least two areas to compare.
+  const score =
+    tracked.length < 2 || !weight
+      ? null
+      : Math.round(100 * (0.7 * coverage + 0.3 * participation) + 1e-9);
+  const weakest = [...tracked].sort((a, b) => a.rate! - b.rate!)[0];
+  const phrase =
+    score === null
+      ? `${tracked.length} of 4 areas scheduled`
+      : score >= 80
+        ? "Balanced routine"
+        : score === 0
+          ? "A fresh start"
+          : weakest.domain === "learning"
+            ? "Make room for French"
+            : `${weakest.label} needs attention`;
   return { score, phrase, domains, missing, coverage, participation };
 }
 export function habitRankings(activities: Activity[], minimum = 3) {
@@ -181,13 +189,13 @@ export function weeklyRates(
       end: addDays(start, 6) > range.end ? range.end : addDays(start, 6),
     };
     result.push({
-      date: start,
+      date: interval.start,
       ...rateOf(
         select(activities, interval, today).filter(
           (a) => !domain || a.domain === domain,
         ),
       ),
-      future: start > today,
+      future: interval.start > today,
     });
   }
   return result;
@@ -203,6 +211,10 @@ export function computeMetrics(
     current = select(activities, range, today);
   const previous = rateOf(
     select(activities, comparablePrevious(mode, anchor, today), today),
+  );
+  // Everything scheduled in the period, including dates still ahead.
+  const planned = activities.filter(
+    (a) => a.date >= range.start && a.date <= range.end,
   );
   const performance = rateOf(current),
     french = current.filter((a) => a.domain === "learning"),
@@ -253,6 +265,11 @@ export function computeMetrics(
     days,
     french: rateOf(french),
     health: rateOf(health),
+    planned: {
+      all: planned.length,
+      french: planned.filter((a) => a.domain === "learning").length,
+      health: planned.filter((a) => a.domain === "health").length,
+    },
     activeFrenchDays: activeFrenchDays.length,
     activeFrenchWeeks,
     skills: (

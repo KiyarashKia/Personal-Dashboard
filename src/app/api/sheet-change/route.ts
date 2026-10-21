@@ -16,7 +16,9 @@ export async function POST(request: Request) {
   const raw = await request.text();
   const event = verifySheetChange(
     raw,
-    request.headers.get("x-cadence-signature"),
+    // Scripts installed before the rename still send the old header name.
+    request.headers.get("x-pintelli-signature") ??
+      request.headers.get("x-cadence-signature"),
     secret,
     configuredSheetId(),
   );
