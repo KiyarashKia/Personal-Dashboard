@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "skills": {
+    "apple-hig-designer": {
+      "source": "smithery.ai",
+      "sourceUrl": "https://smithery.ai/skills/axiaoge2/apple-hig-designer",
+      "sourceType": "well-known",
+      "computedHash": "84230cd900ef31e499d7e66a05c7b4908773cc33f090e1e16d108ee8fcf697ae",
+      "wellKnownDigest": "sha256:a4cb1bb059e59ef3be8467499aaa37f8251630197baeede52c1597dae98cf025"
+    },
+    "security-audit": {
+      "source": "cloudflare/security-audit-skill",
+      "sourceType": "github",
+      "skillPath": "skills/security-audit/SKILL.md",
+      "computedHash": "e6b2e317de75da97e9de18d842982994803f3a67a4a6d8154a82323dc3de8528"
+    }
+  }
+}
