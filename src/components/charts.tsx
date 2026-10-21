@@ -81,6 +81,24 @@ export function DomainRings({ data }: { data: DomainRate[] }) {
     </div>
   );
 }
+/** One segment per scheduled activity (capped), lit when completed. */
+export function Meter({
+  completed,
+  scheduled,
+}: {
+  completed: number;
+  scheduled: number;
+}) {
+  const segments = Math.min(scheduled, 28),
+    lit = scheduled ? Math.round((completed / scheduled) * segments) : 0;
+  return (
+    <span className="meter" aria-hidden="true">
+      {Array.from({ length: Math.max(segments, 1) }, (_, i) => (
+        <i key={i} className={i < lit ? "on" : ""} />
+      ))}
+    </span>
+  );
+}
 /** Four mini columns showing each domain's rate. */
 export function DomainBars({ data }: { data: DomainRate[] }) {
   return (

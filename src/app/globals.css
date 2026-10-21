@@ -3,56 +3,51 @@
 :root {
   color-scheme: dark;
 
-  /* Backgrounds: base recedes, elevated surfaces step up in brightness. */
+  /* Premium Dark: pure black canvas, charcoal surfaces, hairline edges. */
   --bg: #000;
-  --surface: #1c1c1e;
-  --surface-2: #2c2c2e;
-  --surface-3: #3a3a3c;
-  --fill: rgb(118 118 128 / 0.24);
-  --fill-2: rgb(118 118 128 / 0.16);
-  --separator: rgb(84 84 88 / 0.55);
-  --hairline: rgb(255 255 255 / 0.06);
+  --surface: #121214;
+  --surface-2: #1c1c1e;
+  --surface-3: #2c2c2e;
+  --fill: rgb(255 255 255 / 0.1);
+  --fill-2: rgb(255 255 255 / 0.05);
+  --separator: rgb(255 255 255 / 0.08);
+  --hairline: rgb(255 255 255 / 0.08);
 
-  /* Labels */
-  --label: #fff;
-  --label-2: rgb(235 235 245 / 0.64);
-  --label-3: rgb(235 235 245 / 0.42);
+  /* Ink */
+  --label: #f5f5f7;
+  --label-2: #86868b;
+  --label-3: #5c5c61;
 
-  /* System colors, dark appearance */
+  /* Color is a signal: blue for function, green for success. */
   --blue: #0a84ff;
   --green: #30d158;
-  --purple: #bf5af2;
   --orange: #ff9f0a;
-  --red: #ff453a;
+  --violet: #9e8cf0;
+  --sand: #d4a65f;
 
-  /* Type */
-  --font:
-    -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display",
-    "Segoe UI Variable Text", "Segoe UI", "Helvetica Neue", Helvetica, Arial,
-    sans-serif;
+  --font: "Helvetica Neue", Helvetica, Arial, sans-serif;
 
   /* Shape and motion */
-  --radius-card: 24px;
-  --radius-tile: 20px;
+  --radius-card: 28px;
+  --radius-tile: 18px;
   --radius-control: 12px;
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
-  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
-  --press: scale(0.97);
+  --press: scale(0.98);
 }
 
 @media (prefers-contrast: more) {
   :root {
-    --label-2: rgb(235 235 245 / 0.84);
-    --label-3: rgb(235 235 245 / 0.66);
-    --separator: rgb(140 140 148 / 0.8);
-    --hairline: rgb(255 255 255 / 0.22);
-    --fill: rgb(118 118 128 / 0.44);
-    --fill-2: rgb(118 118 128 / 0.32);
+    --label-2: #b4b4b9;
+    --label-3: #8e8e93;
+    --separator: rgb(255 255 255 / 0.24);
+    --hairline: rgb(255 255 255 / 0.24);
+    --fill: rgb(255 255 255 / 0.2);
+    --fill-2: rgb(255 255 255 / 0.12);
     --blue: #409cff;
     --green: #30db5b;
-    --purple: #da8fff;
     --orange: #ffb340;
-    --red: #ff6961;
+    --violet: #c2b6ff;
+    --sand: #ecc58a;
   }
 }
 
@@ -260,7 +255,7 @@ a svg {
   grid-auto-columns: 1fr;
   padding: 3px;
   border-radius: 999px;
-  background: var(--fill-2);
+  background: var(--surface);
   box-shadow: inset 0 0 0 1px var(--hairline);
 }
 .mode-control button {
@@ -284,9 +279,6 @@ a svg {
   inset: 0;
   border-radius: inherit;
   background: var(--surface-3);
-  box-shadow:
-    0 1px 2px rgb(0 0 0 / 0.4),
-    inset 0 0 0 0.5px rgb(255 255 255 / 0.1);
 }
 
 .header-actions {
@@ -451,7 +443,7 @@ h1 {
   background: var(--fill);
 }
 .streak-marks i.on {
-  background: var(--orange);
+  background: var(--label);
 }
 .domain-bars {
   display: flex;
@@ -472,7 +464,7 @@ h1 {
   width: 100%;
   height: 100%;
   border-radius: inherit;
-  background: currentColor;
+  background: var(--label);
   transform-origin: bottom;
   transition: transform 600ms var(--ease-out);
 }
@@ -501,10 +493,10 @@ h1 {
   color: var(--green);
 }
 .lavender {
-  color: var(--purple);
+  color: var(--violet);
 }
 .amber {
-  color: var(--orange);
+  color: var(--sand);
 }
 
 /* Numbers */
@@ -517,8 +509,8 @@ h1 {
 }
 .number-value span {
   font-size: clamp(36px, 6vh, 52px);
-  font-weight: 600;
-  letter-spacing: -0.035em;
+  font-weight: 700;
+  letter-spacing: -0.04em;
   line-height: 1;
 }
 .number-value small {
@@ -580,6 +572,7 @@ h1 {
 }
 .card-hero {
   grid-area: 1 / 1 / 3 / 6;
+  background: var(--surface-2);
 }
 .card-french {
   grid-area: 1 / 6 / 2 / 9;
@@ -782,7 +775,7 @@ h1 {
 }
 .domain-rings .ring-track,
 .domain-rings .ring-fill {
-  stroke-width: 15;
+  stroke-width: 12;
 }
 .domain-rings ul {
   display: grid;
@@ -812,8 +805,9 @@ h1 {
   font-variant-numeric: tabular-nums;
 }
 @container (max-width: 470px) {
-  .domain-rings ul {
-    display: none;
+  .hero-completion .domain-rings {
+    grid-area: 2 / 1 / 3 / 3;
+    justify-self: center;
   }
 }
 @container (max-height: 300px) {
@@ -992,7 +986,6 @@ h1 {
   flex: 1 1 0;
   width: 100%;
   min-height: 0;
-  overflow: visible;
 }
 .chart-grid {
   stroke: var(--separator);
@@ -1058,7 +1051,7 @@ h1 {
 .heatmap {
   width: 100%;
   height: 100%;
-  overflow: visible;
+  min-height: 0;
 }
 .heat-label {
   fill: var(--label-2);
@@ -1087,19 +1080,19 @@ h1 {
   stroke: var(--label);
 }
 .level-1 {
-  --heat: rgb(10 132 255 / 0.3);
+  --heat: rgb(10 132 255 / 0.2);
 }
 .level-2 {
-  --heat: rgb(10 132 255 / 0.5);
+  --heat: rgb(10 132 255 / 0.36);
 }
 .level-3 {
-  --heat: rgb(10 132 255 / 0.7);
+  --heat: rgb(10 132 255 / 0.54);
 }
 .level-4 {
-  --heat: rgb(10 132 255 / 0.88);
+  --heat: rgb(10 132 255 / 0.74);
 }
 .level-5 {
-  --heat: #64d2ff;
+  --heat: var(--blue);
 }
 .heat-cell:is(.level-1, .level-2, .level-3, .level-4, .level-5) {
   fill: var(--heat);
@@ -1201,6 +1194,34 @@ h1 {
 }
 
 /* Health */
+.health-view {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 10px;
+}
+.health-view .number-value span {
+  color: var(--green);
+}
+.meter {
+  display: flex;
+  justify-content: space-between;
+  gap: 4px;
+  height: clamp(16px, 22cqh, 48px);
+}
+.meter i {
+  width: 6px;
+  border-radius: 3px;
+  background: var(--fill);
+}
+.meter i.on {
+  background: var(--green);
+}
+@container (max-height: 150px) {
+  .health-view > p:first-of-type {
+    display: none;
+  }
+}
 .walking-view {
   justify-content: center;
   align-items: center;
@@ -1326,10 +1347,51 @@ h1 {
     font-size: 13px;
   }
 }
+@container (max-height: 150px) {
+  .skills-view {
+    gap: 4px;
+  }
+}
 @container (max-height: 130px) {
   .attention-habit,
-  .walking-count {
+  .walking-count,
+  .best-month-view .section-kicker,
+  .best-month-view .metric-context {
     display: none;
+  }
+}
+@container (max-height: 120px) {
+  .skills-view {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    align-content: center;
+    gap: 4px 20px;
+  }
+  .skill-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .skill-row .bar-track {
+    display: none;
+  }
+}
+@container (max-height: 110px) {
+  .practice-view > .number-value {
+    display: none;
+  }
+}
+@container (max-height: 100px) {
+  .trend-chart svg,
+  .milestone-bottom,
+  .health-view .metric-context {
+    display: none;
+  }
+}
+@container (max-height: 90px) {
+  .best-month-view {
+    flex-direction: row;
+    align-items: baseline;
+    justify-content: flex-start;
+    gap: 12px;
   }
 }
 @container (max-width: 240px) {
@@ -1355,6 +1417,32 @@ h1 {
 @container (max-height: 190px) {
   .distribution-view .detail-lead,
   .hero-trend .detail-lead {
+    display: none;
+  }
+}
+@container (max-height: 150px) {
+  .rate-bars {
+    gap: 6px;
+  }
+  .rate-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
+    align-items: center;
+    gap: 12px;
+  }
+  .rate-row > div:first-child {
+    margin: 0;
+  }
+}
+@container (max-height: 100px) {
+  .rate-bars {
+    grid-template-columns: 1fr 1fr;
+    gap: 4px 20px;
+  }
+  .rate-row {
+    display: block;
+  }
+  .rate-row .bar-track {
     display: none;
   }
 }
@@ -1409,11 +1497,12 @@ h1 {
   white-space: nowrap;
 }
 .primary-button {
-  background: var(--blue);
-  color: #fff;
+  background: var(--label);
+  color: #000;
 }
 .secondary-button {
-  background: var(--fill);
+  background: var(--surface);
+  box-shadow: inset 0 0 0 1px var(--hairline);
 }
 .text-button {
   margin-right: auto;
@@ -1488,8 +1577,7 @@ h1 {
     0 24px 64px rgb(0 0 0 / 0.6),
     inset 0 0 0 1px var(--hairline);
   color: var(--label);
-  overflow: auto;
-  overscroll-behavior: contain;
+  overflow: hidden;
   opacity: 0;
   transform: scale(0.96);
   transition:
@@ -1499,6 +1587,8 @@ h1 {
     display 160ms allow-discrete;
 }
 .settings-dialog[open] {
+  display: flex;
+  flex-direction: column;
   opacity: 1;
   transform: none;
   transition-duration: 240ms;
@@ -1525,9 +1615,6 @@ h1 {
   }
 }
 .dialog-heading {
-  position: sticky;
-  top: 0;
-  z-index: 1;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -1548,6 +1635,9 @@ h1 {
 .dialog-body {
   display: grid;
   gap: 20px;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 4px 24px 24px;
 }
 .panel-intro {
@@ -1729,6 +1819,39 @@ h1 {
   font-weight: 600;
 }
 
+/* Short windows: the dialog drops its explanatory copy to fit. */
+@media (max-height: 500px) {
+  .dialog-heading {
+    padding-top: 14px;
+    padding-bottom: 8px;
+  }
+  .dialog-body {
+    gap: 12px;
+    padding-bottom: 16px;
+  }
+  .panel-intro,
+  .fine-print,
+  .help-items p:not(:has(b)) {
+    display: none;
+  }
+  .detail-list > div,
+  .balance-details > div {
+    min-height: 40px;
+  }
+  .weight-input input {
+    height: 32px;
+  }
+  .primary-button,
+  .secondary-button,
+  .text-button {
+    min-height: 40px;
+  }
+  .dialog-actions .text-button {
+    flex: 0 0 auto;
+    order: 0;
+  }
+}
+
 /* Hover only where a precise pointer exists. */
 @media (hover: hover) and (pointer: fine) {
   .mode-control button:not([aria-pressed="true"]):hover,
@@ -1750,7 +1873,7 @@ h1 {
     background: var(--surface-2);
   }
   .primary-button:not(:disabled):hover {
-    background: #2a94ff;
+    background: #fff;
   }
 }
 @media (pointer: coarse) {

@@ -130,7 +130,10 @@ test("server response contains actual metrics before JavaScript runs", async ({
     "opacity",
     "1",
   );
-  await expect(page.locator(".progress-ring")).toHaveCSS("box-shadow", "none");
+  await expect(page.locator("[data-card=french] .progress-ring")).toHaveCSS(
+    "box-shadow",
+    "none",
+  );
   await page.goto("/?mode=day&date=2026-10-20");
   await expect(
     page.getByRole("heading", { name: "Daily completion" }),

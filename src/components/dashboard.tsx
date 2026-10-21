@@ -46,6 +46,7 @@ import {
   DomainBars,
   DomainRings,
   Heatmap,
+  Meter,
   Ring,
   Sparkline,
   TrendChart,
@@ -814,11 +815,15 @@ export default function Dashboard({
                   motionKey={stateKey}
                 >
                   {states.health === 0 ? (
-                    <div className="centered-metric">
-                      <Ring value={m.health.rate} color="mint">
-                        <NumberValue value={percent(m.health.rate)} />
-                        <span>consistency</span>
-                      </Ring>
+                    <div className="health-view">
+                      <NumberValue value={percent(m.health.rate)} />
+                      <p className="metric-context">
+                        A little care goes a long way.
+                      </p>
+                      <Meter
+                        completed={m.health.completed}
+                        scheduled={m.health.scheduled}
+                      />
                       <p className="metric-context">
                         {m.health.completed} of {m.health.scheduled} activities
                       </p>
