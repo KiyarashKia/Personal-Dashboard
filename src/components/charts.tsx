@@ -81,20 +81,18 @@ export function DomainRings({ data }: { data: DomainRate[] }) {
     </div>
   );
 }
-/** One segment per scheduled activity (capped), lit when completed. */
-export function Meter({
-  completed,
-  scheduled,
-}: {
-  completed: number;
-  scheduled: number;
-}) {
-  const segments = Math.min(scheduled, 28),
-    lit = scheduled ? Math.round((completed / scheduled) * segments) : 0;
+const METER_BARS = 24;
+/** Bars rising from short to tall, lit in proportion to completion. */
+export function Meter({ rate }: { rate: number | null }) {
+  const lit = Math.round((rate ?? 0) * METER_BARS);
   return (
     <span className="meter" aria-hidden="true">
-      {Array.from({ length: Math.max(segments, 1) }, (_, i) => (
-        <i key={i} className={i < lit ? "on" : ""} />
+      {Array.from({ length: METER_BARS }, (_, i) => (
+        <i
+          key={i}
+          className={i < lit ? "on" : ""}
+          style={{ height: `${28 + (72 * i) / (METER_BARS - 1)}%` }}
+        />
       ))}
     </span>
   );

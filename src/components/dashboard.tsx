@@ -942,10 +942,7 @@ export default function Dashboard({
                       <p className="metric-context">
                         A little care goes a long way.
                       </p>
-                      <Meter
-                        completed={m.health.completed}
-                        scheduled={m.health.scheduled}
-                      />
+                      <Meter rate={m.health.rate} />
                       <p className="metric-context">
                         {m.health.completed} of {m.health.scheduled} activities
                       </p>
