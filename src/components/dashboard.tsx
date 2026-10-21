@@ -361,7 +361,7 @@ export default function Dashboard({
         className={`app-shell mode-${mode} ${compact ? "is-compact" : ""} ${short ? "is-short" : ""}`}
       >
         <a href="#dashboard-canvas" className="skip-link">
-          Skip to dashboard
+           Skip to dashboard
         </a>
         <header className="app-header">
           <div className="brand">
