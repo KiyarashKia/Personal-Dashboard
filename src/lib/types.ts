@@ -46,9 +46,9 @@ export interface DateRange {
 }
 export type Weights = Record<Domain, number>;
 export const DEFAULT_WEIGHTS: Weights = {
-  health: 35,
-  learning: 30,
-  career: 25,
+  health: 30,
+  learning: 50,
+  career: 10,
   admin: 10,
 };
 export const DOMAIN_NAMES: Record<Domain, string> = {
