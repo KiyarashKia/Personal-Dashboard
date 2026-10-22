@@ -1,4 +1,10 @@
-import { addDays, comparablePrevious, datesIn, periodFor } from "./dates";
+import {
+  addDays,
+  comparablePrevious,
+  datesIn,
+  periodFor,
+  planRange,
+} from "./dates";
 import type {
   Activity,
   DateRange,
@@ -13,8 +19,12 @@ import { DEFAULT_WEIGHTS, DOMAIN_NAMES } from "./types";
 export function percent(value: number | null) {
   if (value === null) return "—";
   const n = Math.round(value * 100);
-  return `${value > 0 && value < 1 ? Math.min(99, Math.max(1, n)) : n}%`;
+  if (value > 0 && n < 1) return "<1%";
+  return `${value < 1 ? Math.min(99, n) : n}%`;
 }
+/** A count with thousands separators, so 1401 reads as 1,401. */
+export const count = (n: number) => n.toLocaleString("en-US");
+const row = (cell: string) => Number(cell.replace(/\D/g, ""));
 export function rateOf(activities: Activity[]): Rate {
   const completed = activities.filter((a) => a.completed).length,
     scheduled = activities.length;
@@ -157,14 +167,17 @@ export function habitRankings(activities: Activity[], minimum = 3) {
 }
 export function monthlyRates(
   activities: Activity[],
-  anchor: ISODate,
+  range: DateRange,
   today: ISODate,
   domain?: Domain,
 ) {
-  const year = anchor.slice(0, 4);
-  return Array.from({ length: 12 }, (_, m) => {
-    const date = `${year}-${String(m + 1).padStart(2, "0")}-01`;
-    return {
+  const result = [];
+  for (
+    let date = periodFor("month", range.start).start;
+    date <= range.end;
+    date = addDays(periodFor("month", date).end, 1)
+  )
+    result.push({
       date,
       ...rateOf(
         select(activities, periodFor("month", date), today).filter(
@@ -172,8 +185,8 @@ export function monthlyRates(
         ),
       ),
       future: date > today,
-    };
-  });
+    });
+  return result;
 }
 export function weeklyRates(
   activities: Activity[],
@@ -207,10 +220,11 @@ export function computeMetrics(
   today: ISODate,
   weights = DEFAULT_WEIGHTS,
 ) {
-  const range = periodFor(mode, anchor),
+  const plan = planRange(activities.map((a) => a.date));
+  const range = periodFor(mode, anchor, plan),
     current = select(activities, range, today);
   const previous = rateOf(
-    select(activities, comparablePrevious(mode, anchor, today), today),
+    select(activities, comparablePrevious(mode, anchor, today, plan), today),
   );
   // Everything scheduled in the period, including dates still ahead.
   const planned = activities.filter(
@@ -219,6 +233,13 @@ export function computeMetrics(
   const performance = rateOf(current),
     french = current.filter((a) => a.domain === "learning"),
     health = current.filter((a) => a.domain === "health");
+  // Progress counts what is done against everything planned in the period;
+  // performance counts it against only what is due so far.
+  const progress = {
+    completed: performance.completed,
+    scheduled: planned.length,
+    rate: planned.length ? performance.completed / planned.length : null,
+  };
   const days = dailyRates(activities, range, today);
   const all = activities.filter((a) => a.date <= today);
   const rolling = rateOf(
@@ -237,11 +258,11 @@ export function computeMetrics(
   const activeFrenchWeeks = new Set(
     activeFrenchDays.map((d) => periodFor("week", d).start),
   ).size;
-  const walking = health.filter((a) => /walk/i.test(a.habit));
-  const walkingDays = dailyRates(walking, range, today).filter(
-    (d) => d.scheduled,
+  const months = monthlyRates(
+    activities,
+    plan ?? periodFor("year", anchor),
+    today,
   );
-  const months = monthlyRates(activities, anchor, today);
   const eligibleMonths = months.filter((m) => m.scheduled > 0);
   const mostConsistent =
     [...eligibleMonths].sort(
@@ -250,16 +271,13 @@ export function computeMetrics(
   const heatRange =
     mode === "day" || mode === "week"
       ? { start: addDays(range.end, -27), end: range.end }
-      : mode === "year"
-        ? {
-            start: `${anchor.slice(0, 4)}-01-01`,
-            end: `${anchor.slice(0, 4)}-12-31`,
-          }
-        : range;
+      : range;
   return {
     range,
+    plan,
     current,
     performance,
+    progress,
     previous,
     change: changeInPoints(performance, previous),
     days,
@@ -272,31 +290,48 @@ export function computeMetrics(
     },
     activeFrenchDays: activeFrenchDays.length,
     activeFrenchWeeks,
+    // Only skills the tracker has rows for; French is one daily box by default.
     skills: (
       ["grammar", "listening", "speaking", "reading", "writing"] as const
-    ).map((skill) => ({
-      skill,
-      ...rateOf(french.filter((a) => a.skill === skill)),
+    )
+      .map((skill) => ({
+        skill,
+        ...rateOf(french.filter((a) => a.skill === skill)),
+      }))
+      .filter((s) => planned.some((a) => a.skill === s.skill)),
+    // In the tracker's row order.
+    healthHabits: [
+      ...new Set(
+        planned
+          .filter((a) => a.domain === "health")
+          .sort((a, b) => row(a.cell) - row(b.cell))
+          .map((a) => a.habit),
+      ),
+    ].map((habit) => ({
+      habit,
+      ...rateOf(health.filter((a) => a.habit === habit)),
     })),
-    walking: {
-      completed: walkingDays.filter((d) => d.completed > 0).length,
-      scheduled: walkingDays.length,
-      rate: walkingDays.length
-        ? walkingDays.filter((d) => d.completed > 0).length / walkingDays.length
-        : null,
-    },
     portfolio: rateOf(current.filter((a) => a.category === "CAREER")),
     income: rateOf(current.filter((a) => a.category === "INCOME")),
     admin: rateOf(current.filter((a) => a.category === "PR")),
     reflection: rateOf(current.filter((a) => a.category === "REVIEW")),
     fullDays: days.filter((d) => d.scheduled > 0 && d.completed === d.scheduled)
       .length,
+    // Each area's progress through its plan for the period.
     distribution: (["learning", "health", "career", "admin"] as const).map(
-      (domain) => ({
-        domain,
-        label: DOMAIN_NAMES[domain],
-        ...rateOf(current.filter((a) => a.domain === domain)),
-      }),
+      (domain) => {
+        const completed = current.filter(
+            (a) => a.domain === domain && a.completed,
+          ).length,
+          scheduled = planned.filter((a) => a.domain === domain).length;
+        return {
+          domain,
+          label: DOMAIN_NAMES[domain],
+          completed,
+          scheduled,
+          rate: scheduled ? completed / scheduled : null,
+        };
+      },
     ),
     rankings: habitRankings(current),
     months,
@@ -309,11 +344,12 @@ export function computeMetrics(
           : days,
     healthTrend:
       mode === "year"
-        ? monthlyRates(activities, anchor, today, "health")
+        ? monthlyRates(activities, range, today, "health")
         : weeklyRates(activities, range, today, "health"),
     heatmap: dailyRates(activities, heatRange, today),
     global: {
       overall: rateOf(all),
+      planned: activities.length,
       balance: routineBalance(activities, today, weights),
       streak: streaks(activities, today),
       rolling,

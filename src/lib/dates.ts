@@ -25,7 +25,22 @@ export function datesIn(range: DateRange): ISODate[] {
     ? []
     : Array.from({ length: n + 1 }, (_, i) => addDays(range.start, i));
 }
-export function periodFor(mode: Mode, anchor: ISODate): DateRange {
+/** The tracker's plan: the first through the last month with scheduled activities. */
+export function planRange(dates: ISODate[]): DateRange | null {
+  if (!dates.length) return null;
+  const sorted = [...dates].sort();
+  return {
+    start: periodFor("month", sorted[0]).start,
+    end: periodFor("month", sorted.at(-1)!).end,
+  };
+}
+/** Year means the tracker's plan when there is one, otherwise the calendar year. */
+export function periodFor(
+  mode: Mode,
+  anchor: ISODate,
+  plan?: DateRange | null,
+): DateRange {
+  if (mode === "year" && plan) return plan;
   const d = dateObject(anchor),
     y = d.getUTCFullYear(),
     m = d.getUTCMonth();
@@ -58,7 +73,11 @@ export function comparablePrevious(
   mode: Mode,
   anchor: ISODate,
   today: ISODate,
+  plan?: DateRange | null,
 ): DateRange {
+  // The plan has nothing before it to compare with.
+  if (mode === "year" && plan)
+    return { start: plan.start, end: addDays(plan.start, -1) };
   const current = periodFor(mode, anchor),
     previous = periodFor(mode, movePeriod(mode, anchor, -1));
   if (current.end <= today) return previous;
@@ -80,8 +99,14 @@ export function formatDate(
     dateObject(date),
   );
 }
-export function periodLabel(mode: Mode, anchor: ISODate): string {
-  const p = periodFor(mode, anchor);
+export function periodLabel(
+  mode: Mode,
+  anchor: ISODate,
+  plan?: DateRange | null,
+): string {
+  const p = periodFor(mode, anchor, plan);
+  if (mode === "year" && plan)
+    return `${formatDate(p.start, { month: "short", year: "numeric" })} – ${formatDate(p.end, { month: "short", year: "numeric" })}`;
   if (mode === "day")
     return formatDate(anchor, {
       weekday: "short",

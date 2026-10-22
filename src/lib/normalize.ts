@@ -35,6 +35,7 @@ export function domainFor(category: string): Domain | null {
       INCOME: "career",
       PR: "admin",
       REVIEW: "admin",
+      HOME: "admin",
     } as Record<string, Domain>
   )[category];
   if (exact) return exact;
@@ -42,7 +43,9 @@ export function domainFor(category: string): Domain | null {
   if (/HEALTH|WELLNESS|MOVEMENT|FITNESS|SELF.CARE/.test(category))
     return "health";
   if (/CAREER|PORTFOLIO|INCOME|JOB/.test(category)) return "career";
-  if (/ADMIN|IMMIGRATION|FINANC|REFLECTION|REVIEW/.test(category))
+  if (
+    /ADMIN|IMMIGRATION|FINANC|REFLECTION|REVIEW|HOME|HOUSE|CHORE/.test(category)
+  )
     return "admin";
   return null;
 }

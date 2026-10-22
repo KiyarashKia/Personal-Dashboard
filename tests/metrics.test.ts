@@ -3,6 +3,8 @@ import {
   addDays,
   comparablePrevious,
   periodFor,
+  periodLabel,
+  planRange,
   todayInZone,
 } from "../src/lib/dates";
 import { normalize, parseCSV } from "../src/lib/normalize";
@@ -84,6 +86,11 @@ describe("normalization from the inspected tracker structure", () => {
       ]),
     ).toThrow("Conflicting");
   });
+  it("files house chores under Life admin", () => {
+    const r = normalize([grid([["HOME", "House chores", false]])]);
+    expect(r.activities[0].domain).toBe("admin");
+    expect(r.warnings).toEqual([]);
+  });
   it("supports custom category names while keeping unmapped activities in overall totals", () => {
     const r = normalize(
       [
@@ -143,6 +150,20 @@ describe("calendar and period correctness", () => {
       start: "2026-08-01",
       end: "2026-08-31",
     }));
+  it("treats Year as the whole plan, from its first month to its last", () => {
+    const plan = planRange(["2027-10-31", "2026-10-20", "2027-03-02"]);
+    expect(plan).toEqual({ start: "2026-10-01", end: "2027-10-31" });
+    expect(periodFor("year", "2027-06-15", plan)).toEqual(plan);
+    expect(periodLabel("year", "2026-10-22", plan)).toBe("Oct 2026 – Oct 2027");
+    // Nothing comes before the plan, so there is nothing to compare with.
+    expect(
+      comparablePrevious("year", "2026-10-22", "2026-10-22", plan),
+    ).toEqual({ start: "2026-10-01", end: "2026-09-30" });
+    expect(periodFor("year", "2026-10-22", null)).toEqual({
+      start: "2026-01-01",
+      end: "2026-12-31",
+    });
+  });
 });
 describe("pure KPI rules", () => {
   it("returns unavailable for zero denominator", () =>
@@ -222,12 +243,13 @@ describe("pure KPI rules", () => {
   });
   it("never rounds a partial rate up to 100% or down to 0%", () => {
     expect(percent(199 / 200)).toBe("99%");
-    expect(percent(1 / 300)).toBe("1%");
+    expect(percent(1 / 300)).toBe("<1%");
+    expect(percent(2 / 1401)).toBe("<1%");
     expect(percent(1)).toBe("100%");
     expect(percent(0)).toBe("0%");
     expect(percent(0.5)).toBe("50%");
   });
-  it("separates what is due so far from everything planned in the period", () => {
+  it("measures Year progress against everything planned in the plan", () => {
     const m = computeMetrics(
       [
         task("2026-10-20", true),
@@ -235,13 +257,41 @@ describe("pure KPI rules", () => {
         task("2026-11-03", false),
         task("2026-12-31", false, "health"),
         task("2027-01-01", false),
+        // Checked ahead of time: planned, but not done until its date comes.
+        task("2027-10-30", true),
       ],
       "year",
       "2026-10-21",
       "2026-10-21",
     );
+    expect(m.range).toEqual({ start: "2026-10-01", end: "2027-10-31" });
     expect(m.performance).toEqual({ completed: 1, scheduled: 2, rate: 0.5 });
-    expect(m.planned).toEqual({ all: 4, french: 2, health: 2 });
+    expect(m.progress).toEqual({ completed: 1, scheduled: 6, rate: 1 / 6 });
+    expect(m.planned).toEqual({ all: 6, french: 4, health: 2 });
+    expect(m.trend).toHaveLength(13);
+    expect(m.trend[0]).toMatchObject({ date: "2026-10-01", scheduled: 2 });
+    expect(m.trend.at(-1)).toMatchObject({ date: "2027-10-01", future: true });
+    expect(m.distribution[0]).toMatchObject({
+      domain: "learning",
+      completed: 1,
+      scheduled: 4,
+    });
+    expect(m.change).toBeNull();
+  });
+  it("matches the month tab's own rate: done over everything planned", () => {
+    const m = computeMetrics(
+      [
+        task("2026-10-20", true),
+        task("2026-10-21", false),
+        task("2026-10-30", false),
+        task("2026-10-31", false),
+      ],
+      "month",
+      "2026-10-21",
+      "2026-10-21",
+    );
+    expect(m.progress.rate).toBe(0.25);
+    expect(m.performance.rate).toBe(0.5);
   });
   it("labels each week bar by its first day inside the period", () => {
     const m = computeMetrics(
@@ -253,14 +303,42 @@ describe("pure KPI rules", () => {
     expect(m.trend[0].date).toBe("2026-10-01");
     expect(m.trend[1].date).toBe("2026-10-04");
   });
-  it("counts walking days rather than checkboxes", () => {
+  it("breaks health down by each planned activity", () => {
     const rows = [
-      task("2026-10-20", true, "health", "Walk"),
-      task("2026-10-20", true, "health", "Walking outside"),
+      task("2026-10-20", true, "health", "Physical activity"),
+      task("2026-10-20", false, "health", "Mental care"),
+      task("2026-10-21", false, "health", "Physical activity"),
+      task("2026-10-23", false, "health", "Mental care"),
     ];
-    const m = computeMetrics(rows, "week", "2026-10-20", "2026-10-20");
-    expect(m.walking.completed).toBe(1);
-    expect(m.walking.scheduled).toBe(1);
+    const m = computeMetrics(rows, "week", "2026-10-21", "2026-10-21");
+    expect(m.healthHabits).toEqual([
+      { habit: "Physical activity", completed: 1, scheduled: 2, rate: 0.5 },
+      { habit: "Mental care", completed: 0, scheduled: 1, rate: 0 },
+    ]);
+  });
+  it("lists only French skills the tracker has rows for", () => {
+    const m = computeMetrics(
+      [
+        {
+          ...task(
+            "2026-10-20",
+            true,
+            "learning",
+            "French study (any practice)",
+          ),
+          skill: null,
+        },
+        {
+          ...task("2026-10-21", false),
+          habit: "Listening practice",
+          skill: "listening" as const,
+        },
+      ],
+      "week",
+      "2026-10-21",
+      "2026-10-21",
+    );
+    expect(m.skills.map((s) => s.skill)).toEqual(["listening"]);
   });
 });
 describe("free-quota guardrails", () => {

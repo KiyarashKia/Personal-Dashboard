@@ -377,6 +377,9 @@ h1 {
 /* Overview tiles: the chosen tile widens and grows in place; the rest of the
    layout gives up space instead of being covered. */
 .overview {
+  /* The width an open tile settles at: 2.2 of 5.2 shares after the gaps. */
+  --open-width: calc((min(100vw, 1600px) - 64px - 48px) * 2.2 / 5.2);
+  --tile-pad: 18px;
   display: grid;
   grid-template-columns:
     minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr)
@@ -424,6 +427,14 @@ h1 {
 }
 .overview-card:not(.expanded):active {
   transform: var(--press);
+}
+/* Switching tiles: the closing one waits for the new one to open, so the row
+   never dips and the cards below don't jump. */
+.overview[data-open] .overview-card:not(.expanded) {
+  transition:
+    grid-template-rows var(--expand) var(--ease-expand) 320ms,
+    transform 160ms var(--ease-out),
+    background-color 200ms ease;
 }
 .overview-summary {
   display: grid;
@@ -489,11 +500,15 @@ h1 {
   visibility: visible;
   transition-delay: 0s;
 }
+/* Details keep the open tile's width while the column grows or shrinks, so
+   they never rewrap mid-animation; the column reveals them instead. */
 .overview-more > div {
+  container: details / inline-size;
   display: grid;
   justify-items: start;
   gap: 10px;
-  margin: 0 18px;
+  width: calc(var(--open-width) - 2 * var(--tile-pad));
+  margin-left: var(--tile-pad);
   padding: 12px 0 14px;
   border-top: 1px solid var(--separator);
   opacity: 0;
@@ -550,8 +565,8 @@ h1 {
   font-size: 12px;
   font-weight: 400;
 }
-/* Narrow tiles list facts as rows; narrower ones drop the visual. */
-@container tile (max-width: 380px) {
+/* Narrow details list facts as rows; narrower tiles drop the visual. */
+@container details (max-width: 344px) {
   .overview-facts {
     grid-auto-flow: row;
     gap: 0;
@@ -571,7 +586,7 @@ h1 {
     margin-left: 6px;
   }
 }
-@container tile (max-width: 260px) {
+@container details (max-width: 224px) {
   .overview-facts dd small {
     display: none;
   }
@@ -584,9 +599,6 @@ h1 {
 @container tile (max-width: 170px) {
   .overview-summary {
     padding-inline: 12px;
-  }
-  .overview-more > div {
-    margin-inline: 12px;
   }
   .overview-chevron {
     display: none;
@@ -944,6 +956,15 @@ h1 {
   font-size: 13px;
   font-weight: 400;
 }
+.hero-pace {
+  color: var(--label-2);
+  font-size: 13px;
+}
+.hero-pace b {
+  color: var(--label);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
 .hero-progress {
   height: 8px;
   border-radius: 4px;
@@ -1012,6 +1033,12 @@ h1 {
     grid-template-columns: repeat(2, auto);
   }
 }
+/* The encouragement line goes first; the numbers stay. */
+@container (max-height: 420px) {
+  .hero-period {
+    display: none;
+  }
+}
 @container (max-height: 300px) {
   .hero-completion {
     row-gap: 0;
@@ -1022,7 +1049,8 @@ h1 {
 }
 @container (max-height: 230px) {
   .hero-period,
-  .hero-count {
+  .hero-count,
+  .hero-pace {
     display: none;
   }
 }
@@ -1109,7 +1137,7 @@ h1 {
 .distribution-view,
 .health-trend,
 .practice-view,
-.walking-view,
+.health-habits,
 .milestones-view,
 .spotlight-view,
 .best-month-view,
@@ -1385,6 +1413,9 @@ h1 {
 .skills-view {
   justify-content: center;
 }
+.skills-view > .metric-context {
+  text-align: center;
+}
 .skill-row {
   display: grid;
   grid-template-columns: 76px minmax(0, 1fr) 52px;
@@ -1402,7 +1433,6 @@ h1 {
   text-align: right;
 }
 .skill-row small,
-.walking-count small,
 .career-view small {
   color: var(--label-2);
   font-weight: 500;
@@ -1438,25 +1468,8 @@ h1 {
     display: none;
   }
 }
-.walking-view {
+.health-habits {
   justify-content: center;
-  align-items: center;
-  text-align: center;
-}
-.walking-count {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-}
-.walking-count span {
-  font-size: 22px;
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-}
-.walking-count p {
-  color: var(--label-2);
-  font-size: 13px;
 }
 
 /* Activity and focus */
@@ -1539,18 +1552,25 @@ h1 {
   .spotlight-icon {
     display: none;
   }
+} /* Very short: the headline alone, or the explanation alone. */
+@container (max-height: 70px) {
+  .spotlight-view p,
+  .attention-habit {
+    display: none;
+  }
+  .spotlight-view h3 {
+    font-size: 17px;
+  }
 }
 
 /* Small card heights: drop secondary lines before anything clips. */
 @container (max-height: 170px) {
   .practice-view .metric-context,
-  .walking-count p,
   .milestones-view p {
     display: none;
   }
   .skills-view,
   .practice-view,
-  .walking-view,
   .spotlight-view {
     gap: 6px;
   }
@@ -1570,7 +1590,6 @@ h1 {
 }
 @container (max-height: 130px) {
   .attention-habit,
-  .walking-count,
   .best-month-view .section-kicker,
   .best-month-view .metric-context {
     display: none;
@@ -2207,6 +2226,8 @@ h1 {
     white-space: nowrap;
   }
   .overview {
+    --open-width: calc((100vw - 32px - 8px) * 1.6 / 2.6);
+    --tile-pad: 14px;
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     gap: 8px;
   }
@@ -2227,9 +2248,6 @@ h1 {
   .overview-summary {
     padding: 10px 14px;
   }
-  .overview-more > div {
-    margin-inline: 14px;
-  }
   .overview-content {
     min-height: 0;
   }
@@ -2238,6 +2256,24 @@ h1 {
   }
   .overview-card:not(.expanded) .overview-note {
     display: none;
+  }
+  /* Two rows of two: only tiles sharing a row wait for each other, since
+     heights across rows add up rather than overlap. */
+  .overview:is([data-open="0"], [data-open="1"])
+    .overview-card:nth-child(n + 3),
+  .overview:is([data-open="2"], [data-open="3"])
+    .overview-card:nth-child(-n + 2) {
+    transition-delay: 0s;
+  }
+  /* The open tile's neighbour keeps its note, so a closing tile doesn't drop
+     a line mid-switch. */
+  .overview:is([data-open="0"], [data-open="1"])
+    .overview-card:nth-child(-n + 2)
+    .overview-note,
+  .overview:is([data-open="2"], [data-open="3"])
+    .overview-card:nth-child(n + 3)
+    .overview-note {
+    display: block;
   }
   .card {
     --card-pad: 18px;
@@ -2279,6 +2315,15 @@ h1 {
   .text-button {
     flex-basis: 100%;
     order: 1;
+  }
+}
+
+/* Small phones: the headline and tile footnotes give their height to the
+   card, so an open tile still leaves it room. */
+@media (max-width: 699px) and (max-height: 740px) {
+  h1,
+  .overview-more .fine-print {
+    display: none;
   }
 }
 

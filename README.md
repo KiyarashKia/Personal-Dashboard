@@ -63,20 +63,21 @@ This optional integration is supplied and tested locally; its Google triggers ar
 The parser reads the structure, not fixed task names, row numbers, monthly denominators, or checkbox counts:
 
 - Monthly tabs use English month names plus a four-digit year, such as `Oct 2026` or `November 2027`.
-- The date row begins with day numbers `1, 2, 3` in column C. Each day continues in the next column.
+- The date row begins with day numbers `1, 2, 3` in column C. Each day continues in the next column. It can sit anywhere above the header row, with weekday or week rows in between.
 - A header row contains **AREA** and **ACTION** in columns A and B.
+- Merged title and summary cells, and the per-row DONE, TARGET and RATE columns after the last day, are ignored.
 - Rows beneath it contain a category, an activity label, and scheduled checkbox cells.
 - `TRUE` means scheduled and complete, `FALSE` means scheduled and unfinished, and a blank means unscheduled.
 
 You can add/reorder activities, change labels, change schedules, check/uncheck tasks, and add monthly tabs without changing dashboard code. API reads discover the current grid row count; public CSV exports include added rows automatically. The unrelated `DASHBOARD` sheet and summary/formula rows are ignored.
 
-Category names determine semantic groups. The inspected categories map as follows: FRENCH → learning, HEALTH → health, CAREER/INCOME → career, PR/REVIEW → life admin. Common descriptive aliases are recognized. If you invent a category name with no identifiable meaning, set a semantic override rather than expecting the software to guess:
+Category names determine semantic groups. The inspected categories map as follows: FRENCH → learning, HEALTH → health, CAREER/INCOME → career, PR/REVIEW/HOME → life admin, so house chores count toward Life admin. Common descriptive aliases are recognized. If you invent a category name with no identifiable meaning, set a semantic override rather than expecting the software to guess:
 
 ```dotenv
 GOOGLE_CATEGORY_DOMAINS={"MY LANGUAGE STUDY":"learning","PERSONAL CARE":"health"}
 ```
 
-Unknown categories still count toward overall progress; balance reports an explicit source note. French skill and walking submetrics recognize descriptive label keywords; changing a habit's semantic meaning may require updating those small classifiers. A renamed generic French activity still counts in French completion even when its skill is unknown.
+Unknown categories still count toward overall progress; balance reports an explicit source note. French skills come from label keywords (grammar, listening, speaking, reading, writing) and only appear when the tracker has rows for them. A general row such as "French study (any practice)" counts in French completion without a skill. Health activities are listed by their own labels, so merging or renaming them needs no code change.
 
 Leave `GOOGLE_SHEET_RANGES` empty for automatic discovery. To intentionally limit the source, supply a JSON array of full ranges beginning at A1, such as `["'Oct 2026'!A1:AG85"]`. Explicit ranges are an intentional cap: increase their end row when you add rows, or return to automatic discovery.
 
@@ -87,41 +88,44 @@ Every number comes from the checkbox cells in the monthly tabs. Nothing is estim
 ### Ground rules
 
 - **One cell is one activity.** A checkbox on a date means that activity is scheduled for that day. `TRUE` is done, `FALSE` is not done yet, and a blank cell is not scheduled and is never counted.
-- **Due versus planned.** An activity is _due_ once its date is today or earlier in the dashboard's timezone (America/Toronto by default). _Planned_ means everything scheduled in the period, including dates still ahead. Completion rates always use what is due, so a year you are ten months into is not scored against December's tasks. The cards show both counts, for example "6 of 14 due · 420 planned".
+- **Planned, due and done.** _Planned_ is everything scheduled in the period, including dates still ahead. An activity is _due_ once its date is today or earlier in the dashboard's timezone (America/Toronto by default). _Done_ is a checked box on a date that is due. A box checked ahead of time counts as done once its date arrives.
+- **Two measures from those counts.** _Progress_ is done ÷ planned: how much of the whole period's plan is behind you. It matches the RATE on each month tab. _Completion_ is done ÷ due: how well you're keeping up with what could already be done. It matches COMPLETION TO DATE on the DASHBOARD tab. Once a period is over, the two are the same number.
+- **Year is the whole plan.** Year covers the first month tab to the last, Oct 2026 to Oct 2027 in the current tracker, so it shows all 1,401 planned activities the DASHBOARD tab adds up. Day, Week and Month follow the calendar.
 - **Today counts as due.** Today's unchecked activities are part of the denominator, so a rate rises as you check things off during the day. The one exception is the French streak (below).
 - **Weeks run Sunday to Saturday.**
 - **Nothing due shows "—".** A period with no due activities has no rate. It never shows 0%.
-- **Percentages are whole numbers that don't overstate.** 100% appears only when everything due is done, and 0% only when nothing is. For example, 199 of 200 shows 99%, not 100%.
+- **Percentages are whole numbers that don't overstate.** 100% appears only when everything is done, and 0% only when nothing is. 199 of 200 shows 99%, not 100%, and 2 of 1,401 shows <1%, not 0%.
 - **Duplicates count once.** If the same activity appears twice for the same date with the same state, it counts once. If the two copies disagree, the dashboard shows an error and doesn't pick one.
 
 ### Period cards
 
 These follow the Day, Week, Month or Year you select.
 
-| Metric            | Calculation                                                                                                                                                      | Why                                                                                                                    |
-| ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| Completion        | Activities done ÷ activities due in the period                                                                                                                   | The plain share of what you set out to do and could already have done.                                                 |
-| Change            | This period's rate minus the previous period's, in percentage points. A period in progress is compared with the same number of elapsed days in the previous one. | Comparing 21 days of October with all 30 days of September would be unfair to October.                                 |
-| Trend             | Day and Week show each day. Month shows each Sunday-to-Saturday week, labelled by its first day inside the month. Year shows each month.                         | Each bar covers a span long enough to be meaningful at that zoom level.                                                |
-| Areas             | Completion within French, Health, Career and Life admin                                                                                                          | Shows where the period's effort went.                                                                                  |
-| French completion | French activities done ÷ French activities due                                                                                                                   |                                                                                                                        |
-| Practice days     | Dates with at least one French activity done                                                                                                                     | Practice is about showing up. Three exercises on one day are still one practice day.                                   |
-| Skills            | Completion for French activities whose label names grammar, listening, speaking, reading or writing                                                              |                                                                                                                        |
-| Health completion | Health activities done ÷ Health activities due                                                                                                                   |                                                                                                                        |
-| Health meter      | 24 bars that rise from short to tall. The number lit is the completion rate × 24, rounded.                                                                       | A fixed scale looks the same whether you have 3 health activities or 60, so it reads as progress, not as a task count. |
-| Walking           | Days with a Health activity whose label contains "walk" and at least one of them done ÷ days with one scheduled                                                  | Walking is a daily habit. Two walk entries on one day count as one walking day.                                        |
-| Activity map      | Each day's completion: blank if nothing is scheduled, level 0 if nothing is done, levels 1–4 by quarter of completion, level 5 when everything is done           | Quarters keep the colour steps even, and "all done" gets its own level so a full day stands out.                       |
-| Full days         | Days with at least one activity due where every one is done                                                                                                      | A day with nothing scheduled can't be a full day.                                                                      |
-| Habit spotlight   | Completion per activity label. A habit needs at least 3 due before it is ranked.                                                                                 | Fewer than 3 chances makes a 100% or 0% meaningless.                                                                   |
-| Best month        | The month in the selected year with the highest completion. Ties go to the earlier month.                                                                        |                                                                                                                        |
+| Metric            | Calculation                                                                                                                                                                                                    | Why                                                                                                                    |
+| ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| Progress          | Done ÷ planned in the period. The card's headline, ring and bar.                                                                                                                                               | Answers "how much of this period's plan is done?" For Year that is done out of 1,401.                                  |
+| Due so far        | Done ÷ due, shown under the progress bar while the period is in progress                                                                                                                                       | Early in a period, progress is low by design. This line shows whether you're keeping up.                               |
+| Change            | This period's completion minus the previous period's, in points. A period in progress is compared with the same number of elapsed days in the previous one. Year has nothing before it, so it shows no change. | Comparing 21 days of October with all 30 days of September would be unfair to October.                                 |
+| Trend             | Completion per bar. Day and Week show each day. Month shows each Sunday-to-Saturday week, labelled by its first day inside the month. Year shows each month of the plan.                                       | Each bar covers a span long enough to be meaningful at that zoom level.                                                |
+| By area           | Progress within French, Health, Career and Life admin                                                                                                                                                          | Shows how far each area is through its plan.                                                                           |
+| French completion | French activities done ÷ French activities due                                                                                                                                                                 |                                                                                                                        |
+| Practice days     | Dates with at least one French activity done                                                                                                                                                                   | Practice is about showing up. Three exercises on one day are still one practice day.                                   |
+| Skills            | Completion for French rows whose label names grammar, listening, speaking, reading or writing. Only skills with rows in the tracker appear.                                                                    | French is one daily box in the current tracker, so this view explains how to add skill rows.                           |
+| Health completion | Health activities done ÷ Health activities due                                                                                                                                                                 |                                                                                                                        |
+| Health meter      | 24 bars that rise from short to tall. The number lit is the completion rate × 24, rounded.                                                                                                                     | A fixed scale looks the same whether you have 3 health activities or 60, so it reads as progress, not as a task count. |
+| Health activities | Completion for each Health row, such as Physical activity and Mental care, in the tracker's row order                                                                                                          | Shows which part of health care is slipping without guessing at label keywords.                                        |
+| Activity map      | Each day's completion: blank if nothing is scheduled, level 0 if nothing is done, levels 1–4 by quarter of completion, level 5 when everything is done                                                         | Quarters keep the colour steps even, and "all done" gets its own level so a full day stands out.                       |
+| Full days         | Days with at least one activity due where every one is done                                                                                                                                                    | A day with nothing scheduled can't be a full day.                                                                      |
+| Habit spotlight   | Completion per activity label. A habit needs at least 3 due before it is ranked.                                                                                                                               | Fewer than 3 chances makes a 100% or 0% meaningless.                                                                   |
+| Best month        | The month in the plan with the highest completion. Ties go to the earlier month.                                                                                                                               |                                                                                                                        |
 
 ### Overview tiles
 
 These always run up to today, whichever period you select.
 
-**Overall progress.** All activities done ÷ all activities due, across every tab.
+**Completion to date.** All activities done ÷ all activities due, across every tab. Its details also show the total planned.
 
-**30-day momentum.** Completion over the last 30 days including today, compared with the 30 days before that in percentage points. The sparkline shows each day's rate and leaves a gap on days with nothing scheduled, instead of drawing them as 0%.
+**Last 30 days.** Completion over the last 30 days including today, compared with the 30 days before that in points. The sparkline shows each day's rate and leaves a gap on days with nothing scheduled, instead of drawing them as 0%.
 
 **French streak.** The number of French days in a row on which at least one French activity was done. Only days with French scheduled count, so a planned day off doesn't break the streak. Today stays open until midnight, so an unfinished French task today doesn't reset it. Longest is the best run on record.
 

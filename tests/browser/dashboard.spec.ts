@@ -80,6 +80,15 @@ for (const [width, height] of [
           await card.locator(".card-navigation").click();
         }
       }
+      // An expanded tile makes the cards below it shorter.
+      // Short windows move the tiles into the Overview sheet instead.
+      const tile = page.getByRole("button", { name: /Completion to date/ });
+      if (await tile.isVisible()) {
+        await tile.click();
+        await page.waitForTimeout(600);
+        await contain(page, `${width}x${height} ${mode} with a tile expanded`);
+        await tile.click();
+      }
     }
     expect(errors).toEqual([]);
   });
@@ -138,7 +147,7 @@ test("server response contains actual metrics before JavaScript runs", async ({
     page.getByRole("heading", { name: "Monthly progress" }),
   ).toBeVisible();
   await expect(page.locator("[data-card=hero] .hero-count")).toContainText(
-    "due",
+    "planned",
   );
   await expect(page.locator("[data-card=hero] .card-body")).toHaveCSS(
     "opacity",
@@ -150,7 +159,7 @@ test("server response contains actual metrics before JavaScript runs", async ({
   );
   await page.goto("/?mode=day&date=2026-10-20");
   await expect(
-    page.getByRole("heading", { name: "Daily completion" }),
+    page.getByRole("heading", { name: "Daily progress" }),
   ).toBeVisible();
   await context.close();
 });

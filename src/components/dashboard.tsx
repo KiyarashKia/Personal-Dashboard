@@ -35,7 +35,7 @@ import {
   periodLabel,
   todayInZone,
 } from "@/lib/dates";
-import { computeMetrics, percent, validWeights } from "@/lib/metrics";
+import { computeMetrics, count, percent, validWeights } from "@/lib/metrics";
 import {
   DEFAULT_WEIGHTS,
   type DataResponse,
@@ -62,7 +62,7 @@ const TITLES: Record<Mode, string> = {
   day: "A little progress, every day.",
   week: "Find your rhythm.",
   month: "Small steps. Lasting momentum.",
-  year: "Look how far you’ve come.",
+  year: "The whole plan at a glance.",
 };
 const PERIOD_NAMES: Record<Mode, string> = {
   day: "Daily",
@@ -95,7 +95,7 @@ function NumberValue({
 }
 function Change({
   value,
-  context = "vs. previous period",
+  context = "vs. last period",
 }: {
   value: number | null;
   context?: string;
@@ -115,7 +115,7 @@ function Change({
           ) : (
             <ArrowDownLeft size={15} />
           )}{" "}
-          {Math.abs(value).toFixed(1)} pp <span>{context}</span>
+          {Math.abs(value).toFixed(1)} points <span>{context}</span>
         </>
       )}
     </span>
@@ -149,7 +149,7 @@ function RateBars({
             <i style={{ transform: `scaleX(${r.rate ?? 0})` }} />
           </div>
           <span className="sr-only">
-            {r.completed} of {r.scheduled} scheduled activities
+            {r.completed} of {r.scheduled} done
           </span>
         </div>
       ))}
@@ -157,10 +157,15 @@ function RateBars({
   );
 }
 
-/** Done against what is due so far, plus what is still ahead in the period. */
+/** Done against what is due so far, plus everything planned in the period. */
 function countNote({ completed, scheduled }: Rate, planned: number) {
-  if (!scheduled) return planned ? `${planned} planned` : "Nothing scheduled";
-  return `${completed} of ${scheduled} due${planned > scheduled ? ` · ${planned} planned` : ""}`;
+  if (!scheduled)
+    return planned
+      ? `${count(planned)} planned · none due yet`
+      : "Nothing planned";
+  return planned > scheduled
+    ? `${count(completed)} of ${count(scheduled)} due so far · ${count(planned)} planned`
+    : `${count(completed)} of ${count(scheduled)} done`;
 }
 function days(n: number) {
   return `${n} ${n === 1 ? "day" : "days"}`;
@@ -365,6 +370,9 @@ export default function Dashboard({
     url.searchParams.set("date", date);
     history.replaceState(null, "", url);
   }
+  // Year shows the whole plan, so there is no other year to move to.
+  const plan = metrics?.plan ?? null,
+    fixedPeriod = mode === "year" && !!plan;
   function navigate(direction: number) {
     const next = movePeriod(mode, anchor, direction);
     setAnchor(next);
@@ -405,6 +413,11 @@ export default function Dashboard({
           ? "Checking for changes"
           : "Connected to Sheets";
   const stateKey = `${mode}-${anchor}`;
+  // A period in progress is compared with the same point in the last one.
+  const changeContext =
+    mode === "day"
+      ? "vs. the day before"
+      : `vs. ${metrics?.partial ? "this point " : ""}last ${mode}`;
   const m = metrics;
   const fullDay =
     mode === "day" &&
@@ -484,27 +497,29 @@ export default function Dashboard({
             <button
               className="icon-button"
               aria-label="Previous period"
+              disabled={fixedPeriod}
               onClick={() => navigate(-1)}
             >
               <ChevronLeft size={18} />
             </button>
             <div>
-              <span>{periodLabel(mode, anchor)}</span>
+              <span>{periodLabel(mode, anchor, plan)}</span>
               <small>
                 {m?.future
-                  ? "Upcoming period"
+                  ? "Upcoming"
                   : m?.partial
                     ? `Through ${formatDate(dataset!.today)}`
                     : mode === "week"
                       ? "Sunday – Saturday"
                       : mode === "day" && anchor === dataset?.today
-                        ? "Today · in progress"
-                        : "Complete period"}
+                        ? "Today"
+                        : "Complete"}
               </small>
             </div>
             <button
               className="icon-button"
               aria-label="Next period"
+              disabled={fixedPeriod}
               onClick={() => navigate(1)}
             >
               <ChevronRight size={18} />
@@ -513,8 +528,8 @@ export default function Dashboard({
               className="today-button"
               disabled={
                 !dataset ||
-                periodFor(mode, anchor).start ===
-                  periodFor(mode, dataset.today).start
+                periodFor(mode, anchor, plan).start ===
+                  periodFor(mode, dataset.today, plan).start
               }
               onClick={() => {
                 setAnchor(dataset?.today ?? anchor);
@@ -528,7 +543,7 @@ export default function Dashboard({
         {m && (
           <div
             className="overview"
-            aria-label="Overall performance through today"
+            aria-label="Totals through today"
             data-open={open ?? undefined}
           >
             <OverviewTile
@@ -536,7 +551,7 @@ export default function Dashboard({
               open={open === 0}
               onToggle={() => toggle(0)}
               icon={<Target size={16} />}
-              label="Overall progress"
+              label="Completion to date"
               value={<NumberValue value={percent(m.global.overall.rate)} />}
               visual={
                 <div className="mini-progress">
@@ -547,26 +562,24 @@ export default function Dashboard({
                   />
                 </div>
               }
-              note={`${m.global.overall.completed} of ${m.global.overall.scheduled} to date`}
+              note={`${count(m.global.overall.completed)} of ${count(m.global.overall.scheduled)} due so far`}
             >
               <dl className="overview-facts">
                 <div>
-                  <dt>Completed</dt>
-                  <dd>
-                    {m.global.overall.completed} of {m.global.overall.scheduled}
-                  </dd>
+                  <dt>Done</dt>
+                  <dd>{count(m.global.overall.completed)}</dd>
                 </div>
                 <div>
-                  <dt>{PERIOD_NAMES[mode]} completion</dt>
-                  <dd>{percent(m.performance.rate)}</dd>
+                  <dt>Due so far</dt>
+                  <dd>{count(m.global.overall.scheduled)}</dd>
                 </div>
                 <div>
-                  <dt>Last 30 days</dt>
-                  <dd>{percent(m.global.rolling.rate)}</dd>
+                  <dt>Planned in total</dt>
+                  <dd>{count(m.global.planned)}</dd>
                 </div>
               </dl>
               <p className="fine-print">
-                Global metrics always run through today.
+                Counts every activity due through today, in any period.
               </p>
             </OverviewTile>
             <OverviewTile
@@ -626,7 +639,7 @@ export default function Dashboard({
                   ))}
                 </div>
               }
-              note="One practice makes a day"
+              note="Days in a row with French"
             >
               <dl className="overview-facts">
                 <div>
@@ -643,7 +656,8 @@ export default function Dashboard({
                 </div>
               </dl>
               <p className="fine-print">
-                Streaks skip unscheduled days. Today stays open until midnight.
+                Days with no French planned don’t break a streak. Today counts
+                once it’s done.
               </p>
             </OverviewTile>
             <OverviewTile
@@ -651,24 +665,25 @@ export default function Dashboard({
               open={open === 3}
               onToggle={() => toggle(3)}
               icon={<TrendingUp size={16} />}
-              label="30-day momentum"
+              label="Last 30 days"
               value={<NumberValue value={percent(m.global.rolling.rate)} />}
               visual={<Sparkline data={m.global.spark.map((d) => d.rate)} />}
-              note="Rolling completion · through today"
+              note={`${count(m.global.rolling.completed)} of ${count(m.global.rolling.scheduled)} done`}
             >
               <dl className="overview-facts">
                 <div>
-                  <dt>Completed</dt>
+                  <dt>Done</dt>
                   <dd>
-                    {m.global.rolling.completed} of {m.global.rolling.scheduled}
+                    {count(m.global.rolling.completed)} of{" "}
+                    {count(m.global.rolling.scheduled)}
                   </dd>
                 </div>
                 <div>
-                  <dt>Prior 30 days</dt>
+                  <dt>Vs. the 30 days before</dt>
                   <dd>
                     {m.global.rollingChange === null
                       ? "No comparison yet"
-                      : `${m.global.rollingChange >= 0 ? "+" : "−"}${Math.abs(m.global.rollingChange).toFixed(1)} pp`}
+                      : `${m.global.rollingChange >= 0 ? "+" : "−"}${Math.abs(m.global.rollingChange).toFixed(1)} points`}
                   </dd>
                 </div>
               </dl>
@@ -685,14 +700,12 @@ export default function Dashboard({
             <div className="connection-empty">
               <Layers3 size={40} />
               <h2>
-                {isValidating
-                  ? "Opening your perspective…"
-                  : "Your tracker, one connection away."}
+                {isValidating ? "Loading tracker…" : "Tracker not connected"}
               </h2>
               <p>
                 {error?.message ||
                   initialError ||
-                  "Reading the monthly tabs from Google Sheets."}
+                  "Check that the Google Sheet is shared, then try again."}
               </p>
               <div>
                 <button
@@ -700,7 +713,7 @@ export default function Dashboard({
                   onClick={() => void mutate()}
                   disabled={isValidating}
                 >
-                  <RefreshCw size={16} /> Retry connection
+                  <RefreshCw size={16} /> Try again
                 </button>
                 {sourceURL && (
                   <a
@@ -719,12 +732,12 @@ export default function Dashboard({
               {mainCard("hero") && (
                 <Card
                   id="hero"
-                  title={`${PERIOD_NAMES[mode]} ${mode === "month" ? "progress" : "completion"}`}
+                  title={`${PERIOD_NAMES[mode]} progress`}
                   icon={<Target size={17} />}
                   eyebrow={
                     m.future ? "Upcoming" : m.partial ? "To date" : "Overview"
                   }
-                  states={["Completion", "Trend", "Distribution"]}
+                  states={["Progress", "Trend", "By area"]}
                   index={states.hero}
                   onChange={(i) => state("hero", i)}
                   tone="hero"
@@ -735,7 +748,7 @@ export default function Dashboard({
                       className={`hero-completion ${fullDay ? "fully-complete" : ""}`}
                     >
                       <div className="hero-number">
-                        <NumberValue value={percent(m.performance.rate)} />
+                        <NumberValue value={percent(m.progress.rate)} />
                         <span className="hero-period">
                           {fullDay ? (
                             <>
@@ -744,43 +757,40 @@ export default function Dashboard({
                           ) : m.future ? (
                             "A little planning goes a long way."
                           ) : m.performance.completed ? (
-                            "Every step is adding up."
+                            "Every step adds up."
                           ) : (
-                            "A fresh start. Make it yours."
+                            "A fresh start."
                           )}
                         </span>
                       </div>
                       <div className="hero-bottom">
                         <div className="hero-count">
-                          <span>{m.performance.completed}</span>
+                          <span>{count(m.progress.completed)}</span>
                           <div>
-                            activities completed
+                            done
                             <small>
-                              {m.performance.scheduled
-                                ? `of ${m.performance.scheduled} ${m.partial ? "due so far" : "scheduled"}`
-                                : "nothing due yet"}
-                              {m.planned.all > m.performance.scheduled &&
-                                ` · ${m.planned.all} planned`}
+                              {m.planned.all
+                                ? `of ${count(m.planned.all)} planned`
+                                : "Nothing planned"}
                             </small>
                           </div>
                         </div>
                         <div className="hero-progress">
                           <i
                             style={{
-                              transform: `scaleX(${m.performance.rate ?? 0})`,
+                              transform: `scaleX(${m.progress.rate ?? 0})`,
                             }}
                           />
                         </div>
-                        <Change
-                          value={m.change}
-                          context={
-                            mode === "month"
-                              ? "vs. prior month"
-                              : mode === "week"
-                                ? "vs. prior week"
-                                : "vs. prior period"
-                          }
-                        />
+                        {m.partial && m.performance.scheduled > 0 && (
+                          <p className="hero-pace">
+                            <b>{percent(m.performance.rate)}</b> of the{" "}
+                            {count(m.performance.scheduled)} due so far
+                          </p>
+                        )}
+                        {!fixedPeriod && (
+                          <Change value={m.change} context={changeContext} />
+                        )}
                       </div>
                       <DomainRings data={m.distribution} />
                     </div>
@@ -789,11 +799,12 @@ export default function Dashboard({
                       <div className="detail-lead">
                         <NumberValue value={percent(m.performance.rate)} />
                         <p>
+                          {m.partial ? "Of what’s due so far, " : "Done, "}
                           {mode === "year"
-                            ? "Month by month."
+                            ? "month by month."
                             : mode === "month"
-                              ? "One calendar week at a time."
-                              : "Your daily rhythm."}
+                              ? "week by week."
+                              : "day by day."}
                         </p>
                       </div>
                       <TrendChart
@@ -806,16 +817,18 @@ export default function Dashboard({
                               : "day"
                         }
                       />
-                      <Change value={m.change} />
+                      {!fixedPeriod && (
+                        <Change value={m.change} context={changeContext} />
+                      )}
                     </div>
                   ) : (
                     <div className="distribution-view">
                       <div className="detail-lead">
                         <NumberValue
-                          value={m.performance.completed}
-                          unit="completed"
+                          value={count(m.progress.completed)}
+                          unit="done"
                         />
-                        <p>A place for every part of your routine.</p>
+                        <p>Progress by area, against everything planned.</p>
                       </div>
                       <RateBars
                         rows={m.distribution.map((d) => ({
@@ -842,7 +855,7 @@ export default function Dashboard({
                   title="French"
                   icon={<BookOpen size={17} />}
                   eyebrow="Learning"
-                  states={["Completion", "Practice days", "Skills"]}
+                  states={["Consistency", "Practice days", "Skills"]}
                   index={states.french}
                   onChange={(i) => state("french", i)}
                   tone="blue"
@@ -912,12 +925,18 @@ export default function Dashboard({
                       </div>
                       <p className="metric-context">
                         {mode === "year"
-                          ? `${m.activeFrenchWeeks} French-active weeks`
-                          : "Sunday – Saturday · selected week"}
+                          ? `${m.activeFrenchWeeks} ${m.activeFrenchWeeks === 1 ? "week" : "weeks"} with French`
+                          : "Sunday to Saturday"}
                       </p>
                     </div>
                   ) : (
                     <div className="skills-view">
+                      {!m.skills.length && (
+                        <p className="metric-context">
+                          Add rows like Listening to the tracker to see each
+                          skill.
+                        </p>
+                      )}
                       {m.skills.map((s) => (
                         <div className="skill-row" key={s.skill}>
                           <span>{s.skill}</span>
@@ -942,7 +961,7 @@ export default function Dashboard({
                   title="Health"
                   icon={<Heart size={17} />}
                   eyebrow="Wellbeing"
-                  states={["Completion", "Walking", "Trend"]}
+                  states={["Completion", "Activities", "Trend"]}
                   index={states.health}
                   onChange={(i) => state("health", i)}
                   tone="mint"
@@ -952,7 +971,9 @@ export default function Dashboard({
                     <div className="health-view">
                       <NumberValue value={percent(m.health.rate)} />
                       <p className="metric-context">
-                        A little care goes a long way.
+                        {m.healthHabits.length
+                          ? m.healthHabits.map((h) => h.habit).join(" and ")
+                          : "Nothing planned"}
                       </p>
                       <Meter rate={m.health.rate} />
                       <p className="metric-context">
@@ -960,16 +981,20 @@ export default function Dashboard({
                       </p>
                     </div>
                   ) : states.health === 1 ? (
-                    <div className="walking-view">
-                      <NumberValue value={percent(m.walking.rate)} />
-                      <p className="metric-context">walking consistency</p>
-                      <div className="walking-count">
-                        <span>
-                          {m.walking.completed}
-                          <small> / {m.walking.scheduled}</small>
-                        </span>
-                        <p>scheduled walking days</p>
-                      </div>
+                    <div className="health-habits">
+                      {m.healthHabits.length ? (
+                        <RateBars
+                          rows={m.healthHabits.map((h) => ({
+                            ...h,
+                            label: h.habit,
+                            color: "mint",
+                          }))}
+                        />
+                      ) : (
+                        <p className="metric-context">
+                          No health activities planned in this period.
+                        </p>
+                      )}
                     </div>
                   ) : (
                     <div className="health-trend">
@@ -999,16 +1024,16 @@ export default function Dashboard({
                     <div className="milestones-view">
                       <div>
                         <NumberValue value={m.fullDays} unit="full days" />
-                        <p>Every scheduled activity, completed.</p>
+                        <p>Days with everything done.</p>
                       </div>
                       <div className="milestone-bottom">
                         <CheckCheck size={24} />
                         <span>
                           {mode === "day"
                             ? m.fullDays
-                              ? "A complete day. Nicely done."
-                              : "There’s still room for a small win."
-                            : "A consistent routine starts with one day."}
+                              ? "Everything done today."
+                              : "There’s still time for a small win."
+                            : "A steady routine starts with one full day."}
                         </span>
                       </div>
                     </div>
@@ -1034,17 +1059,17 @@ export default function Dashboard({
                       </span>
                       <h3>
                         {!m.rankings.best
-                          ? "Give your habits a little time."
+                          ? "Give habits a little time."
                           : m.rankings.tied
                             ? "Your habits are at the same pace."
                             : m.rankings.best.habit}
                       </h3>
                       <p>
                         {!m.rankings.best
-                          ? "Three scheduled opportunities unlock a fairer habit comparison."
+                          ? "Habits are compared once each one has been due 3 times."
                           : m.rankings.tied
-                            ? `${percent(m.rankings.best.rate)} across eligible habits.`
-                            : `${percent(m.rankings.best.rate)} · your most consistent habit`}
+                            ? `${percent(m.rankings.best.rate)} done for each habit.`
+                            : `${percent(m.rankings.best.rate)} done · most consistent habit`}
                       </p>
                       {m.rankings.lowest && !m.rankings.tied && (
                         <span className="attention-habit">
@@ -1088,8 +1113,8 @@ export default function Dashboard({
                       />
                       <p className="metric-context">
                         {m.mostConsistent
-                          ? `${m.mostConsistent.completed} of ${m.mostConsistent.scheduled} through today`
-                          : "Your first tracked month starts the story."}
+                          ? `${count(m.mostConsistent.completed)} of ${count(m.mostConsistent.scheduled)} done`
+                          : "Shows once a month has activities due."}
                       </p>
                     </div>
                   )}
@@ -1183,7 +1208,7 @@ export default function Dashboard({
                           {data?.error ||
                             error?.message ||
                             initialError ||
-                            "Your monthly tabs are the source of truth."}
+                            "Reads the monthly tabs in the Google Sheet."}
                         </p>
                       </div>
                     </div>
@@ -1212,7 +1237,7 @@ export default function Dashboard({
                         </dd>
                       </div>
                       <div>
-                        <dt>Active refresh</dt>
+                        <dt>Checks for changes</dt>
                         <dd>Every {dataset?.refreshSeconds ?? 60} seconds</dd>
                       </div>
                       <div>
@@ -1222,8 +1247,9 @@ export default function Dashboard({
                     </dl>
                     {dataset?.warnings.length ? (
                       <p className="notice">
-                        {dataset.warnings.length} source notes.{" "}
-                        {dataset.warnings[0]}
+                        {dataset.warnings.length}{" "}
+                        {dataset.warnings.length === 1 ? "note" : "notes"} about
+                        the tracker. {dataset.warnings[0]}
                       </p>
                     ) : null}
                     <div className="dialog-actions">
@@ -1250,8 +1276,8 @@ export default function Dashboard({
                 ) : panel === "balance" ? (
                   <>
                     <p className="panel-intro">
-                      Make room for all four parts of your routine. This
-                      reflects tracked habits over the last 30 days.
+                      Balance compares the four areas over the last 30 days. Set
+                      how much each area counts.
                     </p>
                     {m && (
                       <div className="balance-details">
@@ -1265,7 +1291,7 @@ export default function Dashboard({
                               <small>
                                 {d.rate === null
                                   ? "Not scheduled"
-                                  : `${percent(d.rate)} · ${d.completed}/${d.scheduled}`}
+                                  : `${percent(d.rate)} · ${d.completed} of ${d.scheduled} done`}
                               </small>
                             </label>
                             <div className="weight-input">
@@ -1295,7 +1321,7 @@ export default function Dashboard({
                     >
                       {validWeights(draft)
                         ? "Weights total 100%"
-                        : `Weights total ${(Object.values(draft) as number[]).reduce((a, b) => a + b, 0)}% · adjust to 100%`}
+                        : `Weights total ${(Object.values(draft) as number[]).reduce((a, b) => a + b, 0)}%. Make them add up to 100%.`}
                     </p>
                     <div className="dialog-actions">
                       <button
@@ -1328,19 +1354,20 @@ export default function Dashboard({
                       </button>
                     </div>
                     <p className="fine-print">
-                      A routine indicator, not a measure of wellbeing. Missing
-                      domains stay unavailable.
+                      Shows routine, not wellbeing. Areas with nothing due are
+                      left out.
                     </p>
                   </>
                 ) : panel === "overview" && m ? (
                   <>
                     <div className="overview-details">
                       <div>
-                        <span>Overall completion</span>
+                        <span>Completion to date</span>
                         <b>{percent(m.global.overall.rate)}</b>
                         <small>
-                          {m.global.overall.completed} of{" "}
-                          {m.global.overall.scheduled} scheduled through today
+                          {count(m.global.overall.completed)} of{" "}
+                          {count(m.global.overall.scheduled)} due so far ·{" "}
+                          {count(m.global.planned)} planned
                         </small>
                       </div>
                       <div>
@@ -1352,65 +1379,64 @@ export default function Dashboard({
                         <small>{m.global.balance.phrase}</small>
                       </div>
                       <div>
-                        <span>Current French streak</span>
+                        <span>French streak</span>
                         <b>
                           {m.global.streak.current}
-                          <small> days</small>
+                          <small>
+                            {m.global.streak.current === 1 ? " day" : " days"}
+                          </small>
                         </b>
-                        <small>
-                          Longest: {m.global.streak.longest} scheduled practice
-                          days
-                        </small>
+                        <small>Longest: {days(m.global.streak.longest)}</small>
                       </div>
                       <div>
-                        <span>30-day momentum</span>
+                        <span>Last 30 days</span>
                         <b>{percent(m.global.rolling.rate)}</b>
                         <small>
-                          {m.global.rolling.completed}/
-                          {m.global.rolling.scheduled} ·{" "}
+                          {count(m.global.rolling.completed)} of{" "}
+                          {count(m.global.rolling.scheduled)} done ·{" "}
                           {m.global.rollingChange === null
-                            ? "No earlier comparison"
-                            : `${m.global.rollingChange >= 0 ? "+" : ""}${m.global.rollingChange.toFixed(1)} pp vs prior 30 days`}
+                            ? "No comparison yet"
+                            : `${m.global.rollingChange >= 0 ? "+" : "−"}${Math.abs(m.global.rollingChange).toFixed(1)} points vs. the 30 days before`}
                         </small>
                       </div>
                     </div>
                     <p className="fine-print">
-                      Streaks skip unscheduled days. Today stays open until
-                      midnight. Global metrics always run through today.
+                      Days with no French planned don’t break a streak. These
+                      totals always run through today.
                     </p>
                   </>
                 ) : (
                   <>
                     <p className="panel-intro">
-                      One screen. Four perspectives on the same routine.
+                      One screen, four views of the same routine.
                     </p>
                     <div className="help-items">
                       <div>
                         <span>01</span>
                         <p>
-                          <b>Change your perspective</b>Day, Week, Month, and
-                          Year fit the same canvas.
+                          <b>Switch views</b>Day, Week, and Month move through
+                          the calendar. Year shows the whole plan.
                         </p>
                       </div>
                       <div>
                         <span>02</span>
                         <p>
-                          <b>Go a little deeper</b>The labeled control at the
-                          bottom of each card reveals another view.
+                          <b>See more</b>The control at the bottom of each card
+                          shows another view.
                         </p>
                       </div>
                       <div>
                         <span>03</span>
                         <p>
-                          <b>Keep your existing rhythm</b>Update your tracker as
-                          usual. The dashboard checks while this tab is open.
+                          <b>Update the tracker as usual</b>The dashboard checks
+                          for changes while this tab is open.
                         </p>
                       </div>
                     </div>
                     <p className="fine-print">
-                      Keyboard: T for today · R to refresh · arrow keys in
-                      controls and the activity map. Future tasks never reduce
-                      your current score.
+                      Keyboard: T for today · R to check for changes · arrow
+                      keys in controls and the activity map. Activities that
+                      aren’t due yet never lower a score.
                     </p>
                   </>
                 )}
